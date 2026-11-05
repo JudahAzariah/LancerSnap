@@ -5,7 +5,7 @@ LancerSnap is an AI-assisted campus reporting platform designed for California B
 
 The system analyzes submissions, suggests issue categories and priorities, identifies potential duplicate reports, and routes reports to the appropriate CBU team.
 
-The Problem
+The Problem:
 
 Students may encounter problems across campus but may not always know whether to contact Housing, Facilities, Dining, IT, or building administration.
 
@@ -13,7 +13,7 @@ Although CBU already has personnel responsible for these areas, reporting channe
 
 LancerSnap provides a centralized reporting experience.
 
-Core Workflow
+Core Workflow:
 A student takes or uploads a photograph.
 The student adds or confirms the location.
 AI analyzes the report and suggests a category and priority.
@@ -46,7 +46,6 @@ Other authorized campus teams
 Final routing responsibilities and integrations will need to be validated with CBU.
 
 Technology Stack
-Component	Technology
 Mobile Application	React Native + Expo
 Backend	FastAPI / Python
 Database	PostgreSQL / Supabase
