@@ -101,9 +101,6 @@ The following are outside the current MVP:
 * Continuous GPS tracking.
 * Automated administrative decisions.
 * Automated ownership decisions for lost-and-found items.
-
-Lost-and-found remains a secondary reporting category. It will not be developed as a complete property-management workflow during the MVP.
-
 The implementation will prioritize photo-based campus reporting.
 
 ---
@@ -485,7 +482,7 @@ This phase ensures that the MVP behaves reliably, protects data, and satisfies t
 * `US-13` — Manage Categories.
 * `RC-01` through `RC-12`.
 * `DD-09` — Emergency Boundary.
-* `DD-10` — Lost-and-Found as a Secondary Category.
+*  DD-10 — Campus Reporting MVP Boundary
 
 ### Deliverables
 
