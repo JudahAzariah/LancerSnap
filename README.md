@@ -76,6 +76,10 @@ ROADMAP.md — High-level implementation phases and project direction.
 
 Additional project documentation and the Software Design Document are maintained in the docs/ directory.
 
+Getting Started
+
+The mobile app lives in mobile/ (React Native + Expo) and the backend API in backend/ (FastAPI). See [docs/Development-Setup.md](docs/Development-Setup.md) for prerequisites and the commands to run and check both projects locally.
+
 Development Approach
 
 LancerSnap will be developed through phased implementation.
