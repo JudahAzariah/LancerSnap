@@ -87,6 +87,42 @@ npm run typecheck
 npm run lint
 ```
 
+## Supabase authentication
+
+LancerSnap uses Supabase for sign-in. The mobile app signs the user in with
+Supabase and sends the access token to the backend, which verifies it on every
+protected request.
+
+1. Create a project at <https://supabase.com> (or use the existing LancerSnap project).
+2. In the Supabase dashboard, copy two **public** values:
+   - **Project URL** (Project Settings → Data API), like `https://<project-ref>.supabase.co`
+   - **Publishable key** (Project Settings → API Keys; older projects call it the `anon` key)
+3. Put them in the local env files:
+
+   | File | Variable | Value |
+   | :--- | :--- | :--- |
+   | `mobile/.env` | `EXPO_PUBLIC_SUPABASE_URL` | Project URL |
+   | `mobile/.env` | `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key |
+   | `backend/.env` | `SUPABASE_URL` | Project URL |
+
+4. Create a test account: Authentication → Users → **Add user**, with an email
+   and password, and tick **Auto Confirm User**. There is no self-service
+   sign-up in the app; accounts are created by an administrator.
+5. Restart both dev servers so they pick up the new values, then sign in.
+
+After signing in, the home screen shows "Server check: your session is
+verified" when the backend has accepted the token.
+
+Notes:
+
+- The backend verifies tokens with the project's public signing keys, so it
+  needs no Supabase secret. Only if your project still uses the legacy shared
+  JWT secret, set `SUPABASE_JWT_SECRET` in `backend/.env` (never in `mobile/`).
+- Do **not** put the Supabase secret / `service_role` key or the database
+  password in `mobile/.env`.
+- Production CBU single sign-on is an open decision (SDD OQ-07) and is not
+  implemented.
+
 ## Environment variables and secrets
 
 - Real values live only in local `.env` files, which are git-ignored.
