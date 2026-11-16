@@ -74,10 +74,46 @@ erDiagram
 
 ## Access control
 
-Row-level security is **enabled on every table with no policies**, so nothing
-is readable or writable through the public Supabase API. Role-based policies
-are added in LS-04. The backend remains the authoritative authorization
-boundary (RC-01).
+Access follows SDD RC-01 and is enforced in two layers.
+
+**1. The backend (authoritative).** The FastAPI backend connects with a
+server-side connection string and is the only writer. It looks up the caller's
+role and team membership on every request (`backend/app/authz.py`) and scopes
+every query accordingly.
+
+**2. Row-level security (second layer).** For anything that reaches Supabase
+directly with a user's token, the policies in
+`20261116010000_access_policies.sql` allow **read-only** access:
+
+| Table | Student | Staff | Administrator |
+| :--- | :--- | :--- | :--- |
+| `reports` | own reports | reports assigned to a team they belong to | all |
+| `report_media`, `ai_analyses`, `status_history` | for reports they can see | for reports they can see | all |
+| `duplicate_candidates` | none | for reports assigned to their team | all |
+| `notifications` | own | own | all |
+| `profiles` | own | own | all |
+| `teams`, `team_members` | none / own rows | own team / own rows | all |
+| `locations`, `categories` | active rows | active rows | all |
+| `routing_rules` | none | none | all |
+
+- Signed-out callers (`anon`) have no access to any table.
+- No role can insert, update, or delete through the public API, including
+  administrators. All writes go through the backend.
+- A user counts as staff for a team only while their role is `staff` **and**
+  they have a membership row; removing the staff role removes the scope.
+- The policy helper functions live in a non-exposed `private` schema.
+
+### Roles and the first administrator
+
+Every new account starts as `student`. Administrators assign roles and team
+membership through the backend (`/admin/users` endpoints). Because only an
+administrator can do that, the **first** administrator is set once, by hand,
+in the Supabase SQL Editor:
+
+```sql
+update public.profiles set role = 'administrator'
+where id = (select id from auth.users where email = 'you@example.edu');
+```
 
 ## Decisions made here and still-open questions
 
@@ -103,8 +139,8 @@ file once, in order.
 **Supabase CLI (optional):** `supabase link --project-ref <ref>` then
 `supabase db push`.
 
-To confirm the initial schema is in place, run this in the SQL Editor. It
-should return 12 rows, each with `rls_enabled = true`:
+To confirm the schema is in place, run this in the SQL Editor. It should return
+12 rows, each with `rls_enabled = true`:
 
 ```sql
 select relname as table_name, relrowsecurity as rls_enabled
@@ -116,7 +152,7 @@ order by relname;
 ## Testing migrations
 
 The tests apply every migration to a clean, in-memory PostgreSQL (PGlite) and
-check tables, constraints, and deny-by-default access. They never touch a real
+check tables, constraints, and the access policies for each role. They never touch a real
 Supabase project.
 
 ```bash

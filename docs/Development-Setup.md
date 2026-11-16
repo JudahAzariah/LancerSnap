@@ -135,6 +135,15 @@ Notes:
 
 ## Database
 
+The backend connects to PostgreSQL directly. In the Supabase dashboard click
+**Connect**, copy the **Session pooler** connection string, replace
+`[YOUR-PASSWORD]` with the database password, and set it as `DATABASE_URL` in
+`backend/.env`. This value is a secret: it never goes in `mobile/.env` or in git.
+
+Backend tests do not use that database. They start a throwaway in-memory
+Postgres from `supabase/`, so run `npm install` in `supabase/` once (Node.js
+required); without it, the database tests are skipped.
+
 The schema is defined by SQL migrations in `supabase/migrations/`. See
 [Database-Schema.md](Database-Schema.md) for what the tables mean, how to apply
 migrations to a Supabase project, and how to run the migration tests.
