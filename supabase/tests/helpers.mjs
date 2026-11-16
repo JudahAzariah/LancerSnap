@@ -13,9 +13,14 @@ const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'migr
 const SUPABASE_BOOTSTRAP = `
   create schema auth;
   create table auth.users (id uuid primary key, email text);
+  -- Supabase's auth.uid(): the signed-in user's id from the request token.
+  create function auth.uid() returns uuid language sql stable as $$
+    select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
+  $$;
   create role anon nologin;
   create role authenticated nologin;
   grant usage on schema public to anon, authenticated;
+  grant usage on schema auth to anon, authenticated;
   -- Supabase grants table privileges to these roles by default; row-level
   -- security is what actually protects the data.
   alter default privileges in schema public grant all on tables to anon, authenticated;
@@ -50,5 +55,15 @@ export async function asRole(db, role, fn) {
     return await fn();
   } finally {
     await db.exec('reset role');
+  }
+}
+
+/** Run `fn` as a signed-in user reaching Supabase directly with their token. */
+export async function asUser(db, userId, fn) {
+  await db.query("select set_config('request.jwt.claim.sub', $1, false)", [userId]);
+  try {
+    return await asRole(db, 'authenticated', fn);
+  } finally {
+    await db.query("select set_config('request.jwt.claim.sub', '', false)");
   }
 }

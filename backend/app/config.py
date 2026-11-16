@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str = ""
     supabase_jwt_audience: str = "authenticated"
 
+    # PostgreSQL connection string for the Supabase database (SECRET: contains
+    # the database password). Server-side only.
+    database_url: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

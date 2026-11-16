@@ -7,8 +7,15 @@ import { Button } from '@/components/Button';
 import { apiFetch } from '@/lib/api';
 import { colors } from '@/theme';
 
-type Me = { id: string; email: string | null };
+type Role = 'student' | 'staff' | 'administrator';
+type Me = { id: string; email: string | null; role: Role; team_ids: string[] };
 type BackendCheck = 'checking' | 'verified' | 'failed';
+
+const ROLE_LABEL: Record<Role, string> = {
+  student: 'Student',
+  staff: 'Campus staff',
+  administrator: 'Administrator',
+};
 
 const BACKEND_LABEL: Record<BackendCheck, string> = {
   checking: 'Checking your session with the server…',
@@ -20,14 +27,17 @@ const BACKEND_LABEL: Record<BackendCheck, string> = {
 export default function HomeScreen() {
   const { session, signOut } = useAuth();
   const [backend, setBackend] = useState<BackendCheck>('checking');
+  const [role, setRole] = useState<Role | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     apiFetch<Me>('/me')
-      .then(() => {
-        if (active) setBackend('verified');
+      .then((me) => {
+        if (!active) return;
+        setRole(me.role);
+        setBackend('verified');
       })
       .catch(() => {
         if (active) setBackend('failed');
@@ -57,6 +67,7 @@ export default function HomeScreen() {
         <Text accessibilityLiveRegion="polite" style={styles.body}>
           {BACKEND_LABEL[backend]}
         </Text>
+        {role ? <Text style={styles.body}>Role: {ROLE_LABEL[role]}</Text> : null}
 
         {signOutError ? (
           <Text accessibilityRole="alert" style={styles.error}>

@@ -259,29 +259,30 @@ describe('related records', () => {
   });
 });
 
-describe('deny by default (until LS-04 adds policies)', () => {
-  for (const role of ['anon', 'authenticated']) {
-    it(`${role} cannot read or write reports through the public API`, async () => {
-      await newReport();
-      await asRole(db, role, async () => {
-        const result = await db.query('select count(*)::int as visible from reports');
-        assert.equal(result.rows[0].visible, 0);
-        await assert.rejects(
-          db.query('insert into reports (submitter_id, location_id) values ($1, $2)', [
-            STUDENT,
-            ids.location,
-          ]),
-        );
-      });
+describe('public API access without a signed-in user', () => {
+  it('anon cannot read or write reports', async () => {
+    await newReport();
+    await asRole(db, 'anon', async () => {
+      await assert.rejects(db.query('select count(*) from reports'));
+      await assert.rejects(
+        db.query('insert into reports (submitter_id, location_id) values ($1, $2)', [
+          STUDENT,
+          ids.location,
+        ]),
+      );
     });
-  }
+  });
 
-  it('authenticated cannot read profiles or change a role', async () => {
+  it('a token with no user identity sees no rows and cannot write', async () => {
     await asRole(db, 'authenticated', async () => {
-      const result = await db.query('select count(*)::int as visible from profiles');
-      assert.equal(result.rows[0].visible, 0);
-      const update = await db.query(`update profiles set role = 'administrator'`);
-      assert.equal(update.affectedRows, 0);
+      for (const table of TABLES) {
+        const result = await db.query(`select count(*)::int as visible from ${table}`);
+        // Active reference data is intentionally readable by any signed-in role.
+        if (!['locations', 'categories'].includes(table)) {
+          assert.equal(result.rows[0].visible, 0, table);
+        }
+      }
+      await assert.rejects(db.query(`update profiles set role = 'administrator'`));
     });
     const profile = await one('select role from profiles where id = $1', [STUDENT]);
     assert.equal(profile.role, 'student');

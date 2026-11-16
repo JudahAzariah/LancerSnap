@@ -5,69 +5,42 @@ or real credential is involved.
 """
 
 import time
-from typing import Any
+from uuid import UUID
 
 import jwt
-import pytest
-from cryptography.hazmat.primitives.asymmetric import ec
+import psycopg
 from fastapi.testclient import TestClient
 
 from app.auth import TokenVerifier, get_token_verifier
 from app.main import app
+from tests.conftest import (
+    AUDIENCE,
+    ISSUER,
+    bearer,
+    make_claims,
+    make_token,
+    other_signing_key,
+)
 
-ISSUER = "https://example-project.supabase.co/auth/v1"
-AUDIENCE = "authenticated"
 USER_ID = "11111111-2222-3333-4444-555555555555"
 HS_SECRET = "test-only-shared-secret-of-sufficient-length"
 
-_private_key = ec.generate_private_key(ec.SECP256R1())
-_other_private_key = ec.generate_private_key(ec.SECP256R1())
+_auth = bearer
+_token = make_token
+_claims = make_claims
+_other_private_key = other_signing_key
 
 
-class _StaticKeyVerifier(TokenVerifier):
-    """Verifier that uses a fixed public key instead of fetching a JWKS."""
-
-    def _signing_key(self, token: str, algorithm: str) -> Any:
-        if algorithm == "ES256":
-            return _private_key.public_key()
-        return super()._signing_key(token, algorithm)
-
-
-def _claims(**overrides: Any) -> dict[str, Any]:
-    now = int(time.time())
-    claims: dict[str, Any] = {
-        "sub": USER_ID,
-        "email": "student@example.edu",
-        "aud": AUDIENCE,
-        "iss": ISSUER,
-        "iat": now,
-        "exp": now + 300,
-    }
-    claims.update(overrides)
-    return {key: value for key, value in claims.items() if value is not None}
-
-
-def _token(key: Any = _private_key, algorithm: str = "ES256", **overrides: Any) -> str:
-    return jwt.encode(_claims(**overrides), key, algorithm=algorithm)
-
-
-def _auth(token: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture
-def client() -> Any:
-    app.dependency_overrides[get_token_verifier] = lambda: _StaticKeyVerifier(
-        issuer=ISSUER, audience=AUDIENCE
-    )
-    yield TestClient(app)
-    app.dependency_overrides.clear()
-
-
-def test_valid_token_identifies_user(client: TestClient) -> None:
+def test_valid_token_identifies_user(client: TestClient, db: psycopg.Connection) -> None:
+    db.execute("insert into auth.users (id) values (%s)", (UUID(USER_ID),))
     response = client.get("/me", headers=_auth(_token()))
     assert response.status_code == 200
-    assert response.json() == {"id": USER_ID, "email": "student@example.edu"}
+    assert response.json() == {
+        "id": USER_ID,
+        "email": "student@example.edu",
+        "role": "student",
+        "team_ids": [],
+    }
 
 
 def test_missing_token_is_rejected(client: TestClient) -> None:
@@ -117,7 +90,8 @@ def test_hs256_token_rejected_when_no_secret_configured(client: TestClient) -> N
     assert client.get("/me", headers=_auth(token)).status_code == 401
 
 
-def test_hs256_token_accepted_when_legacy_secret_configured() -> None:
+def test_hs256_token_accepted_when_legacy_secret_configured(db: psycopg.Connection) -> None:
+    db.execute("insert into auth.users (id) values (%s)", (UUID(USER_ID),))
     app.dependency_overrides[get_token_verifier] = lambda: TokenVerifier(
         issuer=ISSUER, audience=AUDIENCE, hs256_secret=HS_SECRET
     )
