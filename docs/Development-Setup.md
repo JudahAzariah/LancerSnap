@@ -8,6 +8,7 @@ How to run the LancerSnap mobile app and backend locally.
 | :--- | :--- |
 | `mobile/` | React Native + Expo mobile application (TypeScript) |
 | `backend/` | FastAPI backend API (Python) |
+| `supabase/` | Database migrations (SQL) and their tests |
 | `docs/` | SDD, Implementation Plan, and this guide |
 
 ## Prerequisites
@@ -131,3 +132,9 @@ Notes:
   anyone who has the app. **Never** put secrets in `mobile/.env`.
 - API keys, service credentials, and other secrets belong only in `backend/.env`
   (or the deployment's secret manager). See `POLICY.md` §12.
+
+## Database
+
+The schema is defined by SQL migrations in `supabase/migrations/`. See
+[Database-Schema.md](Database-Schema.md) for what the tables mean, how to apply
+migrations to a Supabase project, and how to run the migration tests.
