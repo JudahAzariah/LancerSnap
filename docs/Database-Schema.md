@@ -90,6 +90,26 @@ backend (`/admin/locations`, `/admin/categories`) with no schema or app change.
   offered is deactivated: it disappears from the lists used for new reports
   but stays on historical reports.
 
+## Report photo storage
+
+`20261116030000_report_media_bucket.sql` creates the private Supabase Storage
+bucket `report-media` (RC-09).
+
+- **Private, with no storage policies.** Nobody can list, read, upload, or
+  delete files in it with a user token or the publishable key.
+- **All access goes through the backend**, which checks permissions and then
+  issues a short-lived signed URL for exactly one file:
+  - *Upload* (`POST /media/uploads`, students only): the backend validates the
+    declared type and size, chooses the path (`<uploader id>/<random>.<ext>`),
+    and records a `report_media` row not yet attached to a report.
+  - *View* (`GET /media/{id}/url`): only the uploader for an unattached photo;
+    otherwise anyone who may view the report — its submitter, staff on the
+    report's assigned team, or an administrator. The link is valid for 5 minutes.
+- **Limits:** JPEG, PNG, WebP, HEIC/HEIF; 10 MB. Enforced by the backend and
+  again by the bucket itself.
+- A missing photo and a photo you may not see return the same "not found".
+- Storage failures return an error to the caller and record nothing (RC-10).
+
 ## Access control
 
 Access follows SDD RC-01 and is enforced in two layers.

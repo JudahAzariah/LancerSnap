@@ -26,6 +26,7 @@ from app import db as app_db
 from app.auth import TokenVerifier, get_token_verifier
 from app.config import Settings
 from app.main import app
+from app.storage import SignedUpload, StorageError, get_storage
 
 ISSUER = "https://example-project.supabase.co/auth/v1"
 AUDIENCE = "authenticated"
@@ -117,7 +118,6 @@ def db(database_url: str) -> Iterator[psycopg.Connection[dict[str, Any]]]:
     """A clean database for one test, plus a direct connection for setup."""
     app_db.init_pool(database_url, max_size=1)
     with psycopg.connect(database_url, row_factory=dict_row, autocommit=True) as connection:
-        connection.execute("delete from auth.users")
         connection.execute(
             """
             truncate public.notifications, public.status_history, public.duplicate_candidates,
@@ -127,6 +127,7 @@ def db(database_url: str) -> Iterator[psycopg.Connection[dict[str, Any]]]:
             restart identity cascade
             """
         )
+        connection.execute("delete from auth.users")
         yield connection
     app_db.close_pool()
 
@@ -165,3 +166,57 @@ def add_member(db: psycopg.Connection[Any], team_id: UUID, user_id: UUID) -> Non
     db.execute(
         "insert into public.team_members (team_id, user_id) values (%s, %s)", (team_id, user_id)
     )
+
+
+def create_location(db: psycopg.Connection[Any], name: str | None = None) -> UUID:
+    row = db.execute(
+        "insert into public.locations (name, location_type) values (%s, 'building') returning id",
+        (name or f"Location {uuid4()}",),
+    ).fetchone()
+    assert row is not None
+    return UUID(str(row["id"]))
+
+
+def create_report(
+    db: psycopg.Connection[Any], submitter_id: UUID, *, team_id: UUID | None = None
+) -> UUID:
+    row = db.execute(
+        """
+        insert into public.reports (submitter_id, location_id, assigned_team_id)
+        values (%s, %s, %s) returning id
+        """,
+        (submitter_id, create_location(db), team_id),
+    ).fetchone()
+    assert row is not None
+    return UUID(str(row["id"]))
+
+
+# --- Fake photo storage -------------------------------------------------------
+
+
+class FakeStorage:
+    """In-memory stand-in for Supabase Storage. Records what was asked of it."""
+
+    def __init__(self) -> None:
+        self.fail = False
+        self.upload_paths: list[str] = []
+        self.download_requests: list[tuple[str, int]] = []
+
+    def create_signed_upload(self, object_path: str) -> SignedUpload:
+        if self.fail:
+            raise StorageError("simulated outage")
+        self.upload_paths.append(object_path)
+        return SignedUpload(url=f"https://storage.test/upload/{object_path}", token="test-token")
+
+    def create_signed_download_url(self, object_path: str, expires_in: int) -> str:
+        if self.fail:
+            raise StorageError("simulated outage")
+        self.download_requests.append((object_path, expires_in))
+        return f"https://storage.test/download/{object_path}?token=signed"
+
+
+@pytest.fixture
+def storage(client: TestClient) -> FakeStorage:
+    fake = FakeStorage()
+    app.dependency_overrides[get_storage] = lambda: fake
+    return fake
