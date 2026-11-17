@@ -73,6 +73,14 @@ export default function HomeScreen() {
                   who handles it.
                 </Text>
                 <View style={styles.gap}>
+                  <Button
+                    label="My reports"
+                    accessibilityHint="See the reports you have submitted and their status"
+                    onPress={() => router.push('/my-reports')}
+                    variant="secondary"
+                  />
+                </View>
+                <View style={styles.gap}>
                   <EmergencyNotice />
                 </View>
               </View>
