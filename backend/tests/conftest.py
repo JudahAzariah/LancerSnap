@@ -26,7 +26,7 @@ from app import db as app_db
 from app.auth import TokenVerifier, get_token_verifier
 from app.config import Settings
 from app.main import app
-from app.storage import SignedUpload, StorageError, get_storage
+from app.storage import SignedUpload, StorageError, StoredObject, get_storage
 
 ISSUER = "https://example-project.supabase.co/auth/v1"
 AUDIENCE = "authenticated"
@@ -201,6 +201,19 @@ class FakeStorage:
         self.fail = False
         self.upload_paths: list[str] = []
         self.download_requests: list[tuple[str, int]] = []
+        # Files that have actually been "uploaded", by object path.
+        self.objects: dict[str, StoredObject] = {}
+
+    def put(
+        self, object_path: str, size_bytes: int = 1000, content_type: str = "image/jpeg"
+    ) -> None:
+        """Simulate the client sending the file through its signed upload link."""
+        self.objects[object_path] = StoredObject(size_bytes=size_bytes, content_type=content_type)
+
+    def get_object(self, object_path: str) -> StoredObject | None:
+        if self.fail:
+            raise StorageError("simulated outage")
+        return self.objects.get(object_path)
 
     def create_signed_upload(self, object_path: str) -> SignedUpload:
         if self.fail:

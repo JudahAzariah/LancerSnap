@@ -12,6 +12,11 @@ export default function AppLayout() {
           <Stack.Screen name="report/new" options={{ title: 'Snap & Report' }} />
           <Stack.Screen name="report/location" options={{ title: 'Location' }} />
           <Stack.Screen name="report/review" options={{ title: 'Review' }} />
+          <Stack.Screen
+            name="report/submitted"
+            // The report is sent; going back into the finished draft makes no sense.
+            options={{ title: 'Report received', headerBackVisible: false, gestureEnabled: false }}
+          />
         </Stack>
       </ReportDraftProvider>
     </ProfileProvider>

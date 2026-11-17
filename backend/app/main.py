@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin_users, health, me, media, reference
+from app.api import admin_users, health, me, media, reference, reports
 from app.config import get_settings
 from app.db import close_pool
 
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
     app.include_router(reference.router)
     app.include_router(reference.admin_router)
     app.include_router(media.router)
+    app.include_router(reports.router)
     return app
 
 

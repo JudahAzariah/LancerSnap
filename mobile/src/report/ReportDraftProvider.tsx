@@ -16,6 +16,12 @@ type ReportDraft = {
   note: string;
   /** The supported campus location the student selected (US-06). */
   location: CampusLocation | null;
+  /**
+   * Id of the photo once it is in protected storage, so a retried submission
+   * does not upload it again. Cleared whenever the photo changes.
+   */
+  uploadedMediaId: string | null;
+  setUploadedMediaId: (id: string | null) => void;
   setPhoto: (photo: ReportPhoto | null) => void;
   setNote: (note: string) => void;
   setLocation: (location: CampusLocation | null) => void;
@@ -28,16 +34,33 @@ export function ReportDraftProvider({ children }: { children: ReactNode }) {
   const [photo, setPhoto] = useState<ReportPhoto | null>(null);
   const [note, setNote] = useState('');
   const [location, setLocation] = useState<CampusLocation | null>(null);
+  const [uploadedMediaId, setUploadedMediaId] = useState<string | null>(null);
+
+  const choosePhoto = useCallback((next: ReportPhoto | null) => {
+    setPhoto(next);
+    setUploadedMediaId(null);
+  }, []);
 
   const reset = useCallback(() => {
     setPhoto(null);
     setNote('');
     setLocation(null);
+    setUploadedMediaId(null);
   }, []);
 
   const value = useMemo<ReportDraft>(
-    () => ({ photo, note, location, setPhoto, setNote, setLocation, reset }),
-    [photo, note, location, reset],
+    () => ({
+      photo,
+      note,
+      location,
+      uploadedMediaId,
+      setUploadedMediaId,
+      setPhoto: choosePhoto,
+      setNote,
+      setLocation,
+      reset,
+    }),
+    [photo, note, location, uploadedMediaId, choosePhoto, reset],
   );
 
   return <ReportDraftContext.Provider value={value}>{children}</ReportDraftContext.Provider>;
