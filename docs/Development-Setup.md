@@ -89,6 +89,24 @@ npm run typecheck
 npm run lint
 ```
 
+### Testing on a phone with Expo Go
+
+1. Put the phone and the computer on the same Wi-Fi network.
+2. Find the computer's Wi-Fi IP address (`ipconfig` on Windows) and set
+   `EXPO_PUBLIC_API_URL=http://<that address>:8000` in `mobile/.env`.
+3. Start the backend so other devices can reach it:
+   `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+4. Start the app with `npx expo start --lan` in `mobile/`.
+5. On the phone, open `http://<that address>:8000/health` in the browser first.
+   If it does not load, the computer's firewall or the Wi-Fi network is
+   blocking the connection (shared and campus networks often isolate devices;
+   a phone hotspot usually works).
+6. In the latest Expo Go, choose "Enter URL manually" and open
+   `exp://<that address>:8081`.
+
+`--host 0.0.0.0` lets other devices on the network reach the backend. All
+endpoints except `/health` still require a signed-in user.
+
 ## Supabase authentication
 
 LancerSnap uses Supabase for sign-in. The mobile app signs the user in with

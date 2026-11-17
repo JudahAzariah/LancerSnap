@@ -36,10 +36,22 @@ class SignedUpload:
     token: str
 
 
+@dataclass(frozen=True)
+class StoredObject:
+    """What storage actually holds for an object (not what the client declared)."""
+
+    size_bytes: int
+    content_type: str
+
+
 class MediaStorage(Protocol):
     def create_signed_upload(self, object_path: str) -> SignedUpload: ...
 
     def create_signed_download_url(self, object_path: str, expires_in: int) -> str: ...
+
+    def get_object(self, object_path: str) -> StoredObject | None:
+        """The stored object's real size and type, or None if nothing was uploaded."""
+        ...
 
 
 class SupabaseStorage:
@@ -85,6 +97,42 @@ class SupabaseStorage:
         if not isinstance(relative, str) or not relative:
             raise StorageError("Storage did not return a download URL")
         return f"{self._base}{relative}"
+
+    def get_object(self, object_path: str) -> StoredObject | None:
+        try:
+            response = httpx.get(
+                f"{self._base}/object/info/{self._object(object_path)}",
+                headers=self._headers,
+                timeout=10,
+            )
+        except httpx.HTTPError as error:
+            raise StorageError(type(error).__name__) from error
+        if response.status_code != 200:
+            if _is_not_found(response):
+                return None
+            raise StorageError(f"Storage returned {response.status_code}")
+        try:
+            data = response.json()
+            size = int(data["size"])
+            content_type = str(data["content_type"])
+        except (ValueError, KeyError, TypeError) as error:
+            raise StorageError("Unexpected storage response") from error
+        return StoredObject(size_bytes=size, content_type=content_type.lower())
+
+
+def _is_not_found(response: httpx.Response) -> bool:
+    """Supabase Storage reports a missing object as HTTP 400 with a not-found body."""
+    if response.status_code == 404:
+        return True
+    try:
+        data = response.json()
+    except ValueError:
+        return False
+    return isinstance(data, dict) and (
+        data.get("code") == "NoSuchKey"
+        or str(data.get("statusCode")) == "404"
+        or data.get("error") == "not_found"
+    )
 
 
 def get_storage(settings: Annotated[Settings, Depends(get_settings)]) -> MediaStorage:

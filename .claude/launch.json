@@ -4,13 +4,68 @@
     {
       "name": "backend",
       "runtimeExecutable": "backend/.venv/Scripts/python.exe",
-      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--app-dir", "backend", "--reload", "--reload-dir", "backend/app", "--port", "8000"],
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--app-dir",
+        "backend",
+        "--reload",
+        "--reload-dir",
+        "backend/app",
+        "--port",
+        "8000"
+      ],
       "port": 8000
     },
     {
       "name": "mobile-web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "mobile", "run", "web", "--", "--port", "8081", "--clear"],
+      "runtimeArgs": [
+        "--prefix",
+        "mobile",
+        "run",
+        "web",
+        "--",
+        "--port",
+        "8081",
+        "--clear"
+      ],
+      "port": 8081
+    },
+    {
+      "name": "backend-lan",
+      "runtimeExecutable": "backend/.venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--app-dir",
+        "backend",
+        "--reload",
+        "--reload-dir",
+        "backend/app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ],
+      "port": 8000
+    },
+    {
+      "name": "mobile-lan",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "mobile",
+        "run",
+        "start",
+        "--",
+        "--lan",
+        "--port",
+        "8081",
+        "--clear"
+      ],
       "port": 8081
     }
   ]

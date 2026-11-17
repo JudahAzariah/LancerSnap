@@ -1,20 +1,51 @@
 import { router } from 'expo-router';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/Button';
 import { EmergencyNotice } from '@/components/EmergencyNotice';
 import { locationTypeLabel } from '@/report/locations';
 import { useReportDraft } from '@/report/ReportDraftProvider';
+import { SubmitError, type SubmitStage, submitReport } from '@/report/submit';
 import { colors } from '@/theme';
 
-/**
- * Snap & Report, step 3: review before submitting. Sending the report is
- * implemented with the submission API (LS-09); until then this screen says so
- * plainly instead of showing a submit button that would not work.
- */
+const STAGE_LABEL: Record<SubmitStage, string> = {
+  uploading: 'Uploading your photo…',
+  submitting: 'Submitting your report…',
+};
+
+/** Snap & Report, step 3 (LS-09; US-01): review, then submit. */
 export default function ReviewStepScreen() {
-  const { photo, note, location } = useReportDraft();
+  const draft = useReportDraft();
+  const { photo, note, location } = draft;
+  const [stage, setStage] = useState<SubmitStage | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const complete = photo !== null && location !== null;
+  const submitting = stage !== null;
+
+  async function handleSubmit() {
+    if (!photo || !location || submitting) return;
+    setError(null);
+    try {
+      const receipt = await submitReport(
+        { photo, location, note, uploadedMediaId: draft.uploadedMediaId },
+        { onStage: setStage, onUploaded: draft.setUploadedMediaId },
+      );
+      draft.reset();
+      router.replace({
+        pathname: '/report/submitted',
+        params: { reference: receipt.reference_code, location: receipt.location.name },
+      });
+    } catch (caught) {
+      if (caught instanceof SubmitError) {
+        if (caught.discardUpload) draft.setUploadedMediaId(null);
+        setError(caught.message);
+      } else {
+        setError('Your report was not submitted. Try again.');
+      }
+      setStage(null);
+    }
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.content} style={styles.scroll}>
@@ -55,14 +86,33 @@ export default function ReviewStepScreen() {
         </View>
       ) : null}
 
-      <View style={styles.notice}>
-        <Text style={styles.noticeText}>
-          Submitting reports is not available in the app yet. Nothing has been sent.
-        </Text>
-      </View>
+      {error ? (
+        <View accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.error}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+
+      {stage ? (
+        <View accessibilityLiveRegion="polite" style={styles.progress}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={styles.value}>{STAGE_LABEL[stage]}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.actions}>
-        <Button label="Back" onPress={() => router.back()} variant="secondary" />
+        <Button
+          busy={submitting}
+          disabled={!complete}
+          label={submitting ? 'Submitting…' : error ? 'Try again' : 'Submit report'}
+          accessibilityHint="Sends your report to campus staff"
+          onPress={handleSubmit}
+        />
+        <Button
+          disabled={submitting}
+          label="Back"
+          onPress={() => router.back()}
+          variant="secondary"
+        />
       </View>
 
       <EmergencyNotice />
@@ -86,14 +136,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  notice: {
-    marginTop: 24,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  noticeText: { fontSize: 15, lineHeight: 21, color: colors.text },
+  progress: { marginTop: 20, flexDirection: 'row', alignItems: 'center', gap: 8 },
   error: {
     marginTop: 20,
     padding: 12,
@@ -103,5 +146,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.errorBackground,
   },
   errorText: { fontSize: 15, lineHeight: 21, color: colors.error },
-  actions: { marginTop: 20, marginBottom: 24 },
+  actions: { marginTop: 24, marginBottom: 24, gap: 12 },
 });
