@@ -23,7 +23,15 @@
     },
     "plugins": [
       "expo-router",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "LancerSnap uses a photo you choose to show campus staff the issue you are reporting.",
+          "cameraPermission": "LancerSnap uses the camera so you can photograph the campus issue you are reporting.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "scheme": "lancersnap",
     "experiments": {

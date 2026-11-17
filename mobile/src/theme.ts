@@ -9,4 +9,7 @@ export const colors = {
   error: '#B91C1C',
   errorBackground: '#FEF2F2',
   disabled: '#6B7280',
+  warningBorder: '#92400E',
+  warningBackground: '#FFFBEB',
+  surface: '#F3F4F6',
 } as const;
