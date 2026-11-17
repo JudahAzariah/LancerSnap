@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, StringConstraints
 
 from app.authz import AdminProfile, CurrentProfile
-from app.db import Db
+from app.db import Connection, Db
 
 router = APIRouter(tags=["reference data"])
 admin_router = APIRouter(prefix="/admin", tags=["administration"])
@@ -58,6 +58,25 @@ class LocationUpdate(BaseModel):
 
 
 _LOCATION_COLUMNS = "id, name, location_type, is_active"
+
+
+def require_active_location(db: Connection, location_id: UUID) -> Location:
+    """Return the location, or reject the request if it is not a supported one.
+
+    Used wherever a client names a location (report submission, US-06). A
+    location that does not exist and one that has been deactivated get the same
+    answer: the client must pick from the current list.
+    """
+    row = db.execute(
+        "select id, name, location_type from public.locations where id = %s and is_active",
+        (location_id,),
+    ).fetchone()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Choose a supported campus location.",
+        )
+    return Location(**row)
 
 
 @router.get("/locations")
