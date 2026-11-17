@@ -1,12 +1,14 @@
 """Campus locations and report categories (LS-05)."""
 
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import psycopg
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from app.api.reference import require_active_location
 from tests.conftest import auth_as, create_user
 
 Db = psycopg.Connection[Any]
@@ -181,3 +183,25 @@ def test_unknown_ids_return_not_found(client: TestClient, db: Db) -> None:
     body = {"is_active": False}
     assert client.patch(f"/admin/locations/{uuid4()}", headers=admin, json=body).status_code == 404
     assert client.patch(f"/admin/categories/{uuid4()}", headers=admin, json=body).status_code == 404
+
+
+# --- Location validation for submissions (LS-07, US-06) ---------------------------
+
+
+def test_active_location_is_accepted(db: Db) -> None:
+    location_id = _location(db, "Library", "building")
+    location = require_active_location(db, UUID(location_id))
+    assert (str(location.id), location.name, location.location_type) == (
+        location_id,
+        "Library",
+        "building",
+    )
+
+
+def test_inactive_or_unknown_location_is_rejected_with_a_clear_message(db: Db) -> None:
+    inactive = _location(db, "Closed Hall", active=False)
+    for location_id in (UUID(inactive), uuid4()):
+        with pytest.raises(HTTPException) as error:
+            require_active_location(db, location_id)
+        assert error.value.status_code == 422
+        assert error.value.detail == "Choose a supported campus location."

@@ -11,6 +11,7 @@ export default function AppLayout() {
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="report/new" options={{ title: 'Snap & Report' }} />
           <Stack.Screen name="report/location" options={{ title: 'Location' }} />
+          <Stack.Screen name="report/review" options={{ title: 'Review' }} />
         </Stack>
       </ReportDraftProvider>
     </ProfileProvider>
