@@ -84,6 +84,7 @@ The placeholder home screen shows whether the backend is reachable.
 Quality checks:
 
 ```bash
+npm test
 npm run typecheck
 npm run lint
 ```
