@@ -25,6 +25,8 @@ async function visibleIds(userId, table) {
 
 before(async () => {
   db = await createDatabase();
+  // Start from empty reference data so the counts below are exact.
+  await db.exec('delete from locations; delete from categories;');
   for (const id of [STUDENT_A, STUDENT_B, STAFF_ONE, STAFF_TWO, FORMER_STAFF, ADMIN]) {
     await createUser(db, id);
   }
@@ -39,7 +41,8 @@ before(async () => {
     [teamOne.id, STAFF_ONE, teamTwo.id, STAFF_TWO, FORMER_STAFF],
   );
   const [active, inactive] = await rows(
-    `insert into locations (name, is_active) values ('Open Building', true), ('Closed Building', false)
+    `insert into locations (name, location_type, is_active)
+     values ('Open Building', 'building', true), ('Closed Building', 'building', false)
      returning id`,
   );
   const [category] = await rows(`insert into categories (name) values ('Test Category') returning id`);
