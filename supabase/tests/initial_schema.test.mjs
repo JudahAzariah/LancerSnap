@@ -35,7 +35,7 @@ before(async () => {
   await createUser(db, STUDENT);
   await createUser(db, STAFF);
   const team = await one(`insert into teams (name) values ('Test Team A') returning id`);
-  const location = await one(`insert into locations (name) values ('Test Building') returning id`);
+  const location = await one(`insert into locations (name, location_type) values ('Test Building', 'building') returning id`);
   const category = await one(`insert into categories (name) values ('Test Category') returning id`);
   ids = { team: team.id, location: location.id, category: category.id };
 });
