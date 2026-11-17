@@ -141,6 +141,13 @@ The backend connects to PostgreSQL directly. In the Supabase dashboard click
 `[YOUR-PASSWORD]` with the database password, and set it as `DATABASE_URL` in
 `backend/.env`. This value is a secret: it never goes in `mobile/.env` or in git.
 
+Report photos are stored in a private Supabase Storage bucket. So the backend
+can create signed upload and download links, set `SUPABASE_SECRET_KEY` in
+`backend/.env` to the project's **secret** API key (Project Settings → API Keys
+→ Secret keys, starting `sb_secret_`; older projects: the `service_role` key).
+This is a secret with full access to the project: backend only, never in
+`mobile/.env`, never in git.
+
 Backend tests do not use that database. They start a throwaway in-memory
 Postgres from `supabase/`, so run `npm install` in `supabase/` once (Node.js
 required); without it, the database tests are skipped.

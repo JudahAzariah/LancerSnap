@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     # the database password). Server-side only.
     database_url: str = ""
 
+    # SECRET. Supabase secret API key (sb_secret_...; older projects call it the
+    # service_role key). Used only by the backend to create short-lived signed
+    # URLs for the private report-media bucket. Never ship it to the client.
+    supabase_secret_key: str = ""
+    report_media_bucket: str = "report-media"
+    # How long a signed download URL for one photo stays valid.
+    media_download_url_seconds: int = 300
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

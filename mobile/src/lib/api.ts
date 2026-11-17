@@ -4,11 +4,24 @@ import { supabase } from '@/lib/supabase';
 export class ApiError extends Error {
   constructor(
     readonly status: number,
-    message: string,
+    /** The server's own explanation, when it sent one that is safe to show. */
+    readonly detail: string | null,
   ) {
-    super(message);
+    super(detail ?? `Request failed (${status})`);
     this.name = 'ApiError';
   }
+}
+
+async function readDetail(response: Response): Promise<string | null> {
+  try {
+    const body: unknown = await response.json();
+    if (body && typeof body === 'object' && 'detail' in body && typeof body.detail === 'string') {
+      return body.detail;
+    }
+  } catch {
+    // Not JSON; fall through.
+  }
+  return null;
 }
 
 /**
@@ -25,7 +38,16 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
   const response = await fetch(`${API_URL}${path}`, { ...init, headers });
   if (!response.ok) {
-    throw new ApiError(response.status, `Request failed (${response.status})`);
+    throw new ApiError(response.status, await readDetail(response));
   }
   return (await response.json()) as T;
+}
+
+/** POST a JSON body to the backend as the signed-in user. */
+export function apiPost<T>(path: string, body: unknown): Promise<T> {
+  return apiFetch<T>(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
