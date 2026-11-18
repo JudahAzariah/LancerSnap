@@ -18,9 +18,20 @@ export type StatusChange = {
   created_at: string;
 };
 
+/**
+ * The report's category and where it came from (LS-13; US-02). An
+ * "ai_suggestion" is not confirmed and must be shown labelled as such.
+ */
+export type ReportCategory = {
+  name: string;
+  source: 'staff' | 'ai_suggestion';
+  uncertain: boolean;
+};
+
 export type ReportDetails = ReportSummary & {
   note: string | null;
   media_id: string | null;
+  category: ReportCategory | null;
   history: StatusChange[];
 };
 
