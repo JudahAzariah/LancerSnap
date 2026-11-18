@@ -62,11 +62,11 @@ LancerSnap is not an emergency-response system. The application must direct user
 | Backend | FastAPI (Python) | API endpoints, request validation, application business logic, report operations, authorization enforcement, routing orchestration, and external-service coordination. |
 | Relational data | PostgreSQL | Persistent records for users/roles, reports, categories, locations, routing rules, status history, AI metadata, duplicate candidates, and notification metadata. |
 | Managed platform | Supabase | Managed authentication, PostgreSQL services, and protected object storage for the prototype. |
-| AI provider | External multimodal AI service (provider/model not yet selected) | Analyzes approved report image/note content and returns structured advisory classification, details, priority, and potential-duplicate information. |
+| AI provider | External multimodal AI service: Claude via the Anthropic API (OQ-03 decision, see §10), behind the backend's provider adapter | Analyzes approved report image/note content and returns structured advisory classification, details, priority, and potential-duplicate information. |
 | Notifications | Notification service (provider/channel not yet selected) | Delivers configured student-facing status updates based on persisted report events. |
 | Location reference | Supported CBU campus location data | Supplies building/location choices in the reporting flow. It is not continuous device tracking. |
 
-The external AI provider and notification provider remain open decisions. Do not select or hard-code a provider, credentials, delivery channel, or cost commitment without an approved decision.
+The AI provider was selected by the project owner (OQ-03, §10). The notification provider remains an open decision. Do not select or hard-code a provider, credentials, delivery channel, or cost commitment without an approved decision.
 
 ## 4. High-Level Architecture
 
@@ -256,13 +256,13 @@ Do not implement downstream behavior before its required data contract and autho
 
 ## 10. Open Architecture Decisions
 
-The following decisions are intentionally not made by this file because the SDD identifies them as open:
+The following decisions are intentionally not made by this file because the SDD identifies them as open. Decisions since made by the project owner are marked in the table:
 
 | SDD reference | Open decision | Rule for implementation agents |
 |---|---|---|
 | OQ-01 | CBU team and category routing | Do not invent official team ownership. Use configurable placeholder/reference data until validated. |
 | OQ-02 | Staff workflow integration | Do not assume full integration with existing CBU systems; implement only the approved MVP workflow. |
-| OQ-03 | AI provider and model | Keep the provider behind an adapter/configuration boundary; evaluate before selecting. |
+| OQ-03 | AI provider and model | **Decided by the project owner (2026-11-16): Claude via the Anthropic API.** The provider stays behind the adapter in `backend/app/ai/` (only `claude.py` imports the SDK); the model is configuration (`AI_MODEL`, default `claude-haiku-5-5` for cost, chosen 2026-11-18), and the key is server-side only (`ANTHROPIC_API_KEY`). Switching providers means adding another adapter. |
 | OQ-04 | Duplicate detection approach | Evaluate category, location, time, and text first; image similarity is conditional on need and feasibility. |
 | OQ-05 | Campus location reference | Use a supported, maintainable location list; confirm its content and owner. |
 | OQ-06 | Notification provider | Keep the provider/channel replaceable until selected. |

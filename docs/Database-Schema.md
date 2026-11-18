@@ -59,7 +59,9 @@ erDiagram
 - **AI output is advisory** (RC-02, RC-03). `ai_analyses` stores the
   suggestion, confidence, and an explicit `is_uncertain` flag. Each retry is a
   new row; the newest row is the current result. Nothing in the schema lets an
-  AI row change a report's status.
+  AI row change a report's status. A row starts `pending` (queued with the
+  report), then becomes `succeeded` or `failed`; a failure keeps a short reason
+  in `error_message` (for example `timeout`) and no result (LS-11).
 - **Duplicate suggestions are non-destructive** (RC-06). A
   `duplicate_candidates` row only links two reports and records the staff
   disposition (`pending`, `confirmed_duplicate`, `not_duplicate`).

@@ -42,6 +42,20 @@ class Settings(BaseSettings):
     # How long a signed download URL for one photo stays valid.
     media_download_url_seconds: int = 300
 
+    # AI analysis (LS-11). Which provider analyzes new reports:
+    #   "disabled"  - no analysis (default; reports are still accepted)
+    #   "mock"      - built-in fake results, no network calls, no cost
+    #   "anthropic" - Claude via the Anthropic API (needs ANTHROPIC_API_KEY)
+    ai_provider: str = "disabled"
+    # SECRET. Anthropic API key. Server-side only, never in the mobile app.
+    anthropic_api_key: str = ""
+    # Project owner's choice (2026-11-18): the lowest-cost current model.
+    ai_model: str = "claude-haiku-5-5"
+    # Per attempt. A report is never held up by this: analysis runs after it is saved.
+    ai_timeout_seconds: float = 60.0
+    # Total attempts per analysis for temporary failures (timeouts, overload).
+    ai_max_attempts: int = 3
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

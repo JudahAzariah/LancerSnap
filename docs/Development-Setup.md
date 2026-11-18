@@ -166,7 +166,38 @@ can create signed upload and download links, set `SUPABASE_SECRET_KEY` in
 This is a secret with full access to the project: backend only, never in
 `mobile/.env`, never in git.
 
-Backend tests do not use that database. They start a throwaway in-memory
+## AI analysis
+
+After a report is saved, the backend can analyze it in the background with an
+AI service (LS-11). Submission never waits for it, and an AI outage never stops
+a report from being accepted. Choose the provider with `AI_PROVIDER` in
+`backend/.env`:
+
+| `AI_PROVIDER` | What happens | Cost |
+| :--- | :--- | :--- |
+| `disabled` (default) | No analysis. | None |
+| `mock` | Built-in fake results labelled "[Mock analysis]". No network calls. Use this for development. | None |
+| `anthropic` | Claude via the Anthropic API. Needs `ANTHROPIC_API_KEY`. | **Every analysis is a paid API call** |
+
+- `ANTHROPIC_API_KEY` is a secret: backend only, never in `mobile/.env`, never in git.
+- `AI_MODEL` defaults to `claude-haiku-5-5`, the lowest-cost current model
+  (chosen by the project owner). Another model can be set here without code
+  changes.
+- Photos are downscaled and stripped of metadata (including GPS) before they
+  are sent. No student identity is sent.
+- Each attempt times out after `AI_TIMEOUT_SECONDS` (60). Temporary failures
+  are retried up to `AI_MAX_ATTEMPTS` (3) in total; then the analysis is
+  recorded as `failed` with a short reason.
+- Staff on the report's team and administrators can read the result with
+  `GET /reports/{id}/analysis` and send a report again with
+  `POST /reports/{id}/analysis`.
+- Restart the backend after changing these settings.
+
+Backend tests never call a real AI service.
+
+## Database tests
+
+Backend tests do not use the Supabase database. They start a throwaway in-memory
 Postgres from `supabase/`, so run `npm install` in `supabase/` once (Node.js
 required); without it, the database tests are skipped.
 

@@ -8,6 +8,7 @@ layer for anything that reaches Supabase without going through this API.
 """
 
 from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Annotated, Any
 
 import psycopg
@@ -59,6 +60,16 @@ def _get_pool() -> ConnectionPool[Connection]:
         init_pool(database_url)
     assert _pool is not None
     return _pool
+
+
+@contextmanager
+def connection() -> Iterator[Connection]:
+    """A pooled connection for background work (outside a request).
+
+    Commits on success and rolls back on error, like `get_db`.
+    """
+    with _get_pool().connection() as conn:
+        yield conn
 
 
 def get_db() -> Iterator[Connection]:

@@ -6,8 +6,9 @@ the photo really is in storage, and stores the report as `submitted` with its
 first status-history entry, all in one transaction. It returns a receipt with
 the report's reference code.
 
-Submission never depends on AI analysis: classification is added later
-(Phase 3) and must not block or fail a valid report.
+Submission never depends on AI analysis (DD-08): when analysis is turned on,
+the report is queued for it in the same transaction and analyzed afterwards
+by a background worker (LS-11). The AI service is never contacted here.
 """
 
 from datetime import datetime
@@ -17,6 +18,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, StringConstraints
 
+from app.analysis import Queue, queue_analysis
 from app.api.reference import Location, require_active_location
 from app.authz import CurrentProfile, Profile, Role, can_view_report, require_roles
 from app.db import Db
@@ -55,7 +57,11 @@ PHOTO_NOT_USABLE = "That photo cannot be used for this report. Add the photo aga
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def submit_report(
-    body: ReportSubmission, profile: StudentProfile, db: Db, storage: Storage
+    body: ReportSubmission,
+    profile: StudentProfile,
+    db: Db,
+    storage: Storage,
+    analysis_queue: Queue,
 ) -> ReportReceipt:
     location = require_active_location(db, body.location_id)
 
@@ -114,6 +120,13 @@ def submit_report(
         """,
         (report["id"], stored.size_bytes, stored.content_type, media["id"]),
     )
+
+    if analysis_queue.enabled:
+        queue_analysis(db, report["id"])
+        # Commit before waking the worker, so it can see the new analysis.
+        # (Background tasks can run before the request's own commit.)
+        db.commit()
+        analysis_queue.notify()
 
     return ReportReceipt(
         id=report["id"],
