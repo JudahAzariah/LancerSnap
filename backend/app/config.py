@@ -59,6 +59,12 @@ class Settings(BaseSettings):
     # RC-02). An implementation choice, not an SDD value: tune it from real use.
     ai_confidence_threshold: float = 0.6
 
+    # Duplicate detection (LS-15, OQ-04). Reports at the same location within
+    # this many hours of each other can be paired as possible duplicates.
+    duplicate_window_hours: float = 72
+    # Word overlap (0-1) needed to pair reports when a category is missing.
+    duplicate_text_threshold: float = 0.3
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

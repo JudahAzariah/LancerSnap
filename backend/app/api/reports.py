@@ -18,9 +18,15 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, StringConstraints
 
-from app.analysis import Queue, latest_validated_analysis, queue_analysis
+from app.analysis import (
+    Queue,
+    latest_validated_analysis,
+    queue_analysis,
+    safe_detect_duplicates,
+)
 from app.api.reference import Location, require_active_location
 from app.authz import CurrentProfile, Profile, Role, can_view_report, require_roles
+from app.config import get_settings
 from app.db import Db
 from app.storage import ALLOWED_CONTENT_TYPES, MAX_UPLOAD_BYTES, Storage, StorageError
 
@@ -127,6 +133,16 @@ def submit_report(
         # (Background tasks can run before the request's own commit.)
         db.commit()
         analysis_queue.notify()
+    else:
+        # No AI analysis is coming, so look for duplicates now, on location,
+        # time, and text only (LS-15). A failure here never blocks submission.
+        settings = get_settings()
+        safe_detect_duplicates(
+            db,
+            report["id"],
+            window_hours=settings.duplicate_window_hours,
+            text_threshold=settings.duplicate_text_threshold,
+        )
 
     return ReportReceipt(
         id=report["id"],
