@@ -37,7 +37,8 @@ export default function ReportSubmittedScreen() {
       </View>
 
       <Text style={styles.body}>
-        Keep the report number for your records. Campus staff will review the report.
+        Keep the report number for your records. Campus staff will review the report. You can
+        follow its status in My reports.
       </Text>
 
       <View style={styles.actions}>
