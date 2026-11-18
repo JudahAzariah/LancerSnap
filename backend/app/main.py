@@ -1,14 +1,21 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from functools import partial
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import db
 from app.ai import ProviderNotConfigured, get_provider
-from app.analysis import AnalysisQueue, AnalysisWorker, DisabledQueue, set_analysis_queue
-from app.api import admin_users, analysis, health, me, media, reference, reports
+from app.analysis import (
+    AnalysisQueue,
+    AnalysisWorker,
+    DisabledQueue,
+    safe_detect_duplicates,
+    set_analysis_queue,
+)
+from app.api import admin_users, analysis, duplicates, health, me, media, reference, reports
 from app.config import Settings, get_settings
 from app.storage import storage_from_settings
 
@@ -35,6 +42,11 @@ def build_analysis_queue(settings: Settings) -> AnalysisQueue:
         connect=db.connection,
         max_attempts=settings.ai_max_attempts,
         confidence_threshold=settings.ai_confidence_threshold,
+        find_duplicates=partial(
+            safe_detect_duplicates,
+            window_hours=settings.duplicate_window_hours,
+            text_threshold=settings.duplicate_text_threshold,
+        ),
     )
     worker.start()
     logger.info("AI analysis is on: %s / %s", provider.name, provider.model)
@@ -70,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(media.router)
     app.include_router(reports.router)
     app.include_router(analysis.router)
+    app.include_router(duplicates.router)
     return app
 
 

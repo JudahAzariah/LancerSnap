@@ -118,7 +118,11 @@ def database_url() -> Iterator[str]:
 def db(database_url: str) -> Iterator[psycopg.Connection[dict[str, Any]]]:
     """A clean database for one test, plus a direct connection for setup."""
     app_db.init_pool(database_url, max_size=1)
-    with psycopg.connect(database_url, row_factory=dict_row, autocommit=True) as connection:
+    # No server-side prepared statements: the test database serves every
+    # connection from one session, so their auto-generated names would clash.
+    with psycopg.connect(
+        database_url, row_factory=dict_row, autocommit=True, prepare_threshold=None
+    ) as connection:
         connection.execute(
             """
             truncate public.notifications, public.status_history, public.duplicate_candidates,

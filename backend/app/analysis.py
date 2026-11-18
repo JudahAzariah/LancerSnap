@@ -29,6 +29,7 @@ from app.ai import AIProvider, AIProviderError, AnalysisOutput, AnalysisRequest
 from app.ai.images import prepare_image
 from app.ai.provider import CategoryOption
 from app.db import Connection
+from app.duplicates import DEFAULT_TEXT_THRESHOLD, DEFAULT_WINDOW_HOURS, detect_duplicates
 from app.storage import MediaStorage, StorageError
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,7 @@ def process_next(
     storage: MediaStorage,
     max_attempts: int,
     confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
+    find_duplicates: Callable[[Connection, UUID], object] | None = None,
     sleep: Callable[[float], None] = time.sleep,
 ) -> UUID | None:
     """Run the oldest pending analysis. Returns its id, or None if none was waiting.
@@ -122,7 +124,31 @@ def process_next(
                     analysis_id,
                 ),
             )
+        # With the category known (or not), look for possible duplicates (LS-15).
+        (find_duplicates or safe_detect_duplicates)(db, UUID(str(row["report_id"])))
     return analysis_id
+
+
+def safe_detect_duplicates(
+    db: Connection,
+    report_id: UUID,
+    *,
+    window_hours: float = DEFAULT_WINDOW_HOURS,
+    text_threshold: float = DEFAULT_TEXT_THRESHOLD,
+) -> None:
+    """Duplicate detection that can never undo or block the analysis.
+
+    It runs in a savepoint: if it fails, only its own changes are rolled back
+    and the failure is logged. Missing a duplicate is safe; staff review every
+    report anyway (RISK-03).
+    """
+    try:
+        with db.transaction():
+            detect_duplicates(
+                db, report_id, window_hours=window_hours, text_threshold=text_threshold
+            )
+    except Exception:
+        logger.exception("Duplicate detection failed for report %s", report_id)
 
 
 def apply_safety_rules(output: AnalysisOutput, *, confidence_threshold: float) -> AnalysisOutput:
@@ -298,8 +324,10 @@ class AnalysisWorker:
         connect: Callable[[], AbstractContextManager[Connection]],
         max_attempts: int,
         confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
+        find_duplicates: Callable[[Connection, UUID], object] | None = None,
         poll_seconds: float = 60.0,
     ) -> None:
+        self._find_duplicates = find_duplicates
         self._provider = provider
         self._storage = storage
         self._connect = connect
@@ -341,6 +369,7 @@ class AnalysisWorker:
                     storage=self._storage,
                     max_attempts=self._max_attempts,
                     confidence_threshold=self._confidence_threshold,
+                    find_duplicates=self._find_duplicates,
                     sleep=self._sleep,
                 )
             if done is None:

@@ -66,7 +66,8 @@ erDiagram
   [AI-Analysis-Schema.md](AI-Analysis-Schema.md) (LS-12).
 - **Duplicate suggestions are non-destructive** (RC-06). A
   `duplicate_candidates` row only links two reports and records the staff
-  disposition (`pending`, `confirmed_duplicate`, `not_duplicate`).
+  disposition (`pending`, `confirmed_duplicate`, `not_duplicate`). How
+  candidates are found is described below (LS-15).
 - **Photos are references, not public files** (RC-09). `report_media` stores
   the storage bucket and object path; the file is in private storage (LS-08).
 - **Status history is the audit trail** (RC-12). `actor_id` is null when the
@@ -113,6 +114,42 @@ bucket `report-media` (RC-09).
   again by the bucket itself.
 - A missing photo and a photo you may not see return the same "not found".
 - Storage failures return an error to the caller and record nothing (RC-10).
+
+## Duplicate detection (LS-15)
+
+`backend/app/duplicates.py` records possible duplicates in
+`duplicate_candidates`. It follows the first stage of OQ-04: category,
+location, submission time, and text. Image similarity is not used (deferred by
+OQ-04), and no other technology is involved.
+
+Two reports are paired when they are at the **same location**, were submitted
+within **`DUPLICATE_WINDOW_HOURS`** (default 72) of each other, and either:
+
+- both have a category and it is the **same** one; or
+- at least one has no category yet, and their **text** (note plus AI summary)
+  overlaps by at least **`DUPLICATE_TEXT_THRESHOLD`** (default 0.3, word
+  overlap from 0 to 1).
+
+Reports with different categories are never paired. A report's category here
+is the staff-confirmed one, otherwise its newest validated AI suggestion. The
+window and threshold are implementation choices, not SDD values; OQ-04 itself
+remains open for later stages such as image similarity.
+
+- **When it runs:** after each AI analysis finishes (succeeded or failed), or
+  at submission when AI analysis is turned off. It runs in its own savepoint:
+  if it fails, the report and its analysis are unaffected.
+- **What it stores:** one row per pair (never both directions), with
+  `similarity_signals`: `rule`, `same_location`, `same_category`,
+  `hours_apart`, `text_similarity`. At most 10 new candidates per run. Running
+  it again never duplicates a pair or undoes a staff decision.
+- **What it never does:** change, merge, close, or delete a report.
+- **Who sees candidates:** staff who handle the report (its team) and
+  administrators, through `GET /reports/{id}/duplicates`, and only candidates
+  whose other report they can also handle. Students cannot see them.
+- **Staff decisions:** `PATCH /reports/{id}/duplicates/{candidate_id}` with
+  `not_duplicate` (keep both reports separate), `confirmed_duplicate`, or
+  `pending`. It records who decided and when. Confirming is only a record:
+  nothing is merged or closed.
 
 ## Access control
 
