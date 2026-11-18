@@ -36,7 +36,11 @@ def test_student_sees_the_category_labelled_as_an_ai_suggestion(
     run_once(
         MockProvider(
             lambda request: mock_output(
-                request, category="Facilities", uncertain=False, uncertainty_reason=None
+                request,
+                category="Facilities",
+                confidence=0.9,  # Above the LS-14 threshold, so it stays certain.
+                uncertain=False,
+                uncertainty_reason=None,
             )
         ),
         storage,

@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     ai_timeout_seconds: float = 60.0
     # Total attempts per analysis for temporary failures (timeouts, overload).
     ai_max_attempts: int = 3
+    # Below this AI confidence (0-1) a result is always marked uncertain (LS-14,
+    # RC-02). An implementation choice, not an SDD value: tune it from real use.
+    ai_confidence_threshold: float = 0.6
 
     @property
     def cors_origin_list(self) -> list[str]:

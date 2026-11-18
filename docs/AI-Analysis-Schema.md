@@ -38,6 +38,43 @@ analysis is recorded as **failed** and stores no suggestion at all.
 The category list is also sent to the provider as a constraint on its output,
 but the backend never relies on the provider having followed it.
 
+## Conservative rules applied before storing (LS-14)
+
+After validation, and outside any provider adapter, the backend applies two
+rules (`apply_safety_rules()` in `backend/app/analysis.py`):
+
+1. **A potential safety hazard is always `high` priority** (RC-07, RISK-04).
+   The AI cannot suggest a lower priority for something that could hurt
+   someone; it can only raise priorities.
+2. **Low confidence is always uncertain** (RC-02). A result with `confidence`
+   below `AI_CONFIDENCE_THRESHOLD` (default `0.6`) is marked uncertain with the
+   reason "Low AI confidence (…); a person should check the category.", unless
+   the AI already gave its own reason. The confidence value itself is kept.
+   The threshold is an implementation choice, not an SDD value; tune it from
+   real use.
+
+The result stays a recommendation. Nothing acts on it automatically: the
+report's status, team, assignee, and category are unchanged; no notification
+or status change is created; and LancerSnap never contacts emergency services
+(RC-03, RC-08).
+
+## How staff see it
+
+Staff on the report's team and administrators see an **AI analysis
+(suggestion only)** panel on the report details screen. Every state is written
+in words with a symbol, never by color alone (RC-11):
+
+- `▲ High priority (suggested)`, `■ Medium priority (suggested)`, `▼ Low priority (suggested)`
+- `⚠ Potential safety hazard: needs human attention`, with the reminder that
+  LancerSnap does not contact emergency services
+- `? Uncertain result`, with the reason, and the AI confidence as a percentage
+- `✕ AI analysis failed` with the reason in plain words, stating that no
+  priority or category was suggested, so a failure is never read as "no
+  priority" (RC-10)
+- `… AI analysis in progress` and `○ Not analyzed by AI`
+
+Students see only the category (below).
+
 ## Where results are stored
 
 Each attempt is one row in `ai_analyses` (see [Database-Schema.md](Database-Schema.md)).

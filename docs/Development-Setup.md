@@ -188,6 +188,9 @@ a report from being accepted. Choose the provider with `AI_PROVIDER` in
 - Each attempt times out after `AI_TIMEOUT_SECONDS` (60). Temporary failures
   are retried up to `AI_MAX_ATTEMPTS` (3) in total; then the analysis is
   recorded as `failed` with a short reason.
+- Results below `AI_CONFIDENCE_THRESHOLD` (0.6) are marked uncertain, and
+  potential safety hazards are always stored as high priority. See
+  [AI-Analysis-Schema.md](AI-Analysis-Schema.md).
 - Staff on the report's team and administrators can read the result with
   `GET /reports/{id}/analysis` and send a report again with
   `POST /reports/{id}/analysis`.

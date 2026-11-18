@@ -1,5 +1,5 @@
 /** Reading a student's own reports back from the server (LS-10; US-03). */
-import { apiFetch } from '@/lib/api';
+import { ApiError, apiFetch } from '@/lib/api';
 import type { CampusLocation } from '@/report/locations';
 
 export type ReportSummary = {
@@ -41,6 +41,36 @@ export function fetchMyReports(): Promise<ReportSummary[]> {
 
 export function fetchReport(id: string): Promise<ReportDetails> {
   return apiFetch<ReportDetails>(`/reports/${encodeURIComponent(id)}`);
+}
+
+/**
+ * The newest AI analysis attempt of a report, for staff and administrators
+ * (LS-11 to LS-14). Suggestion fields are filled only when it succeeded.
+ */
+export type Analysis = {
+  id: string;
+  processing_status: 'pending' | 'succeeded' | 'failed';
+  category: { id: string; name: string } | null;
+  summary: string | null;
+  details: string[] | null;
+  priority: 'low' | 'medium' | 'high' | null;
+  potential_safety_hazard: boolean | null;
+  confidence: number | null;
+  uncertain: boolean;
+  uncertainty_reason: string | null;
+  error: string | null;
+  created_at: string;
+  completed_at: string | null;
+};
+
+/** The current analysis, or null if the report has never been analyzed. */
+export async function fetchAnalysis(reportId: string): Promise<Analysis | null> {
+  try {
+    return await apiFetch<Analysis>(`/reports/${encodeURIComponent(reportId)}/analysis`);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 /** A short-lived link to the report's photo (LS-08). */
