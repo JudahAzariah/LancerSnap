@@ -149,7 +149,8 @@ def test_valid_result_is_stored_as_advisory_analysis(
     assert row["suggested_category_id"] == spills
     assert row["summary"] == VALID["summary"]
     assert row["details"] == VALID["details"]
-    assert row["suggested_priority"] == "medium"
+    # The payload is a safety hazard, so LS-14 stores it as high priority.
+    assert row["suggested_priority"] == "high"
     assert row["is_potential_safety_hazard"] is True
     assert float(row["confidence"]) == 0.82
     assert row["is_uncertain"] is False and row["uncertainty_reason"] is None
@@ -240,7 +241,8 @@ def test_downstream_reads_only_validated_results(
     run_once(MockProvider(lambda request: parse_output(payload())), storage)
     result = latest()
     assert result is not None
-    assert (result.category_id, result.priority, result.confidence) == (spills, "medium", 0.82)
+    # Hazard, so high priority (LS-14).
+    assert (result.category_id, result.priority, result.confidence) == (spills, "high", 0.82)
     assert result.details == VALID["details"]
 
 
@@ -257,7 +259,7 @@ def test_staff_api_returns_the_full_structured_result(
     assert body["processing_status"] == "succeeded"
     assert body["category"] == {"id": str(spills), "name": "Spills"}
     assert body["details"] == VALID["details"]
-    assert body["priority"] == "medium"
+    assert body["priority"] == "high"  # Hazard, so high (LS-14).
     assert body["potential_safety_hazard"] is True
     assert body["confidence"] == 0.82
     assert body["uncertain"] is False and body["uncertainty_reason"] is None

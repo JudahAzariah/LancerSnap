@@ -34,6 +34,7 @@ from app.storage import MediaStorage, StorageError
 logger = logging.getLogger(__name__)
 
 MAX_BACKOFF_SECONDS = 30.0
+DEFAULT_CONFIDENCE_THRESHOLD = 0.6  # Settings.ai_confidence_threshold
 
 
 def queue_analysis(db: Connection, report_id: UUID) -> UUID:
@@ -51,6 +52,7 @@ def process_next(
     provider: AIProvider,
     storage: MediaStorage,
     max_attempts: int,
+    confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
     sleep: Callable[[float], None] = time.sleep,
 ) -> UUID | None:
     """Run the oldest pending analysis. Returns its id, or None if none was waiting.
@@ -83,6 +85,7 @@ def process_next(
         try:
             output = _analyze(row, categories, provider, storage, max_attempts, sleep)
             category_id = resolve_category(output, categories)
+            output = apply_safety_rules(output, confidence_threshold=confidence_threshold)
         except AIProviderError as error:
             logger.warning("AI analysis %s failed: %s", analysis_id, error.code)
             db.execute(
@@ -120,6 +123,29 @@ def process_next(
                 ),
             )
     return analysis_id
+
+
+def apply_safety_rules(output: AnalysisOutput, *, confidence_threshold: float) -> AnalysisOutput:
+    """Conservative handling of a validated result (LS-14; RC-07, RC-02, RISK-04).
+
+    Done here, outside any provider, so it holds whatever the AI said:
+    * A potential safety hazard is always high priority, so it is surfaced for
+      human attention (RC-07). The AI can raise a priority, never lower this.
+    * A result below the confidence threshold is always marked uncertain, with
+      a reason, even if the AI did not flag it (RC-02).
+
+    The result stays advisory: nothing here (or anywhere) acts on the priority
+    automatically, and LancerSnap never contacts emergency services (RC-08).
+    """
+    changes: dict[str, object] = {}
+    if output.potential_safety_hazard and output.priority != "high":
+        changes["priority"] = "high"
+    if output.confidence < confidence_threshold and not output.uncertain:
+        changes["uncertain"] = True
+        changes["uncertainty_reason"] = (
+            f"Low AI confidence ({output.confidence:.2f}); a person should check the category."
+        )
+    return output.model_copy(update=changes) if changes else output
 
 
 def active_categories(db: Connection) -> tuple[CategoryOption, ...]:
@@ -271,12 +297,14 @@ class AnalysisWorker:
         storage: MediaStorage,
         connect: Callable[[], AbstractContextManager[Connection]],
         max_attempts: int,
+        confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
         poll_seconds: float = 60.0,
     ) -> None:
         self._provider = provider
         self._storage = storage
         self._connect = connect
         self._max_attempts = max_attempts
+        self._confidence_threshold = confidence_threshold
         self._poll_seconds = poll_seconds
         self._wake = threading.Event()
         self._stopping = threading.Event()
@@ -312,6 +340,7 @@ class AnalysisWorker:
                     provider=self._provider,
                     storage=self._storage,
                     max_attempts=self._max_attempts,
+                    confidence_threshold=self._confidence_threshold,
                     sleep=self._sleep,
                 )
             if done is None:

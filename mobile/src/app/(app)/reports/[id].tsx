@@ -10,6 +10,8 @@ import {
   View,
 } from 'react-native';
 
+import { useProfile } from '@/auth/ProfileProvider';
+import { AiAnalysisPanel } from '@/components/AiAnalysisPanel';
 import { Button } from '@/components/Button';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ApiError } from '@/lib/api';
@@ -36,8 +38,14 @@ export default function ReportDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
+  const [loadCount, setLoadCount] = useState(0);
+  const profile = useProfile();
+  // Staff and administrators also see the AI analysis; students only see the
+  // category (LS-13). The backend enforces this too.
+  const showsAnalysis = profile.status === 'ready' && profile.profile.role !== 'student';
 
   const load = useCallback(async () => {
+    setLoadCount((count) => count + 1);
     try {
       setState({ status: 'ready', report: await fetchReport(id) });
     } catch (error) {
@@ -111,6 +119,8 @@ export default function ReportDetailsScreen() {
 
       {/* Near the top, so it is seen without scrolling past the photo. */}
       {report.category ? <CategoryField category={report.category} /> : null}
+
+      {showsAnalysis ? <AiAnalysisPanel refreshKey={loadCount} reportId={report.id} /> : null}
 
       <Text style={styles.label}>Photo</Text>
       {report.media_id ? <ReportPhoto mediaId={report.media_id} /> : <Text style={styles.body}>No photo.</Text>}

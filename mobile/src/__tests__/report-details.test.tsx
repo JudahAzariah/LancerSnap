@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { useLocalSearchParams } from 'expo-router';
 
 import ReportDetailsScreen from '@/app/(app)/reports/[id]';
+import { type Role, useProfile } from '@/auth/ProfileProvider';
 import { ApiError } from '@/lib/api';
 import { fetchPhotoUrl, fetchReport, type ReportDetails } from '@/report/tracking';
 
@@ -13,10 +14,23 @@ jest.mock('expo-router', () => {
   };
 });
 jest.mock('@/lib/supabase', () => ({ supabase: null }));
-jest.mock('@/report/tracking', () => ({ fetchReport: jest.fn(), fetchPhotoUrl: jest.fn() }));
+jest.mock('@/report/tracking', () => ({
+  fetchReport: jest.fn(),
+  fetchPhotoUrl: jest.fn(),
+  fetchAnalysis: jest.fn(),
+}));
+jest.mock('@/auth/ProfileProvider', () => ({ useProfile: jest.fn() }));
 
 const getReport = jest.mocked(fetchReport);
 const getPhoto = jest.mocked(fetchPhotoUrl);
+
+function signedInAs(role: Role) {
+  jest.mocked(useProfile).mockReturnValue({
+    status: 'ready',
+    profile: { id: 'u-1', email: null, role, team_ids: [] },
+    retry: jest.fn(),
+  });
+}
 
 const REPORT: ReportDetails = {
   id: 'r-1',
@@ -43,6 +57,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(useLocalSearchParams).mockReturnValue({ id: 'r-1' });
   getPhoto.mockResolvedValue('https://storage.test/signed/photo.jpg');
+  signedInAs('student');
 });
 
 describe('Report details', () => {

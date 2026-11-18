@@ -39,8 +39,13 @@ fix the issue (what is damaged or wrong, its extent, where it is, anything \
 dangerous), taken from the photo or the note, most important first. Leave out \
 anything that does not help with the issue. Fewer details are better than \
 padding.
-- priority: low, medium, or high.
-- potential_safety_hazard: true if the issue could hurt someone.
+- priority: how soon campus staff should look at it: low (cosmetic or minor \
+inconvenience), medium (something broken or not working), or high (could hurt \
+someone, or stops people using an important space or service). Any potential \
+safety hazard is high. When unsure between two levels, choose the higher one.
+- potential_safety_hazard: true if the issue could hurt someone (for example \
+exposed wiring, a wet floor, broken glass, a trip hazard, smoke). When in doubt, \
+say true: a person will review it.
 - confidence: from 0 to 1, how confident you are in the category.
 - uncertain: true if the photo is unclear, the category is a guess, or no \
 category fits.

@@ -34,6 +34,7 @@ def build_analysis_queue(settings: Settings) -> AnalysisQueue:
         storage=storage,
         connect=db.connection,
         max_attempts=settings.ai_max_attempts,
+        confidence_threshold=settings.ai_confidence_threshold,
     )
     worker.start()
     logger.info("AI analysis is on: %s / %s", provider.name, provider.model)
