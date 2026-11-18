@@ -23,10 +23,27 @@ from app.db import Db
 router = APIRouter(prefix="/reports", tags=["analysis"])
 
 
+class SuggestedCategory(BaseModel):
+    id: UUID
+    name: str
+
+
 class Analysis(BaseModel):
+    """One analysis attempt. Suggestion fields are filled only when it succeeded.
+
+    Field meanings are documented in docs/AI-Analysis-Schema.md.
+    """
+
     id: UUID
     processing_status: str  # pending | succeeded | failed
+    category: SuggestedCategory | None
     summary: str | None
+    details: list[str] | None
+    priority: str | None  # low | medium | high
+    potential_safety_hazard: bool | None
+    confidence: float | None
+    uncertain: bool
+    uncertainty_reason: str | None
     # Short failure reason (for example "timeout"); null unless failed.
     error: str | None
     provider: str | None
@@ -35,10 +52,25 @@ class Analysis(BaseModel):
     completed_at: datetime | None
 
 
-_COLUMNS = """
-    id, processing_status::text as processing_status, summary, error_message as error,
-    provider, model, created_at, completed_at
+_SELECT = """
+    select a.id, a.processing_status::text as processing_status,
+           c.id as category_id, c.name as category_name,
+           a.summary, a.details, a.suggested_priority::text as priority,
+           a.is_potential_safety_hazard as potential_safety_hazard,
+           a.confidence::float8 as confidence, a.is_uncertain as uncertain,
+           a.uncertainty_reason, a.error_message as error,
+           a.provider, a.model, a.created_at, a.completed_at
+    from public.ai_analyses a
+    left join public.categories c on c.id = a.suggested_category_id
 """
+
+
+def _analysis(row: dict[str, object]) -> Analysis:
+    category_id, category_name = row.pop("category_id"), row.pop("category_name")
+    category = (
+        SuggestedCategory(id=category_id, name=category_name) if category_id is not None else None
+    )
+    return Analysis(category=category, **row)
 
 
 def _require_manageable_report(
@@ -59,17 +91,14 @@ def _require_manageable_report(
 def get_analysis(report_id: UUID, profile: StaffProfile, db: Db) -> Analysis:
     _require_manageable_report(db, report_id, profile)
     row = db.execute(
-        f"""
-        select {_COLUMNS} from public.ai_analyses
-        where report_id = %s order by created_at desc, id desc limit 1
-        """,
+        f"{_SELECT} where a.report_id = %s order by a.created_at desc, a.id desc limit 1",
         (report_id,),
     ).fetchone()
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="This report has not been analyzed"
         )
-    return Analysis(**row)
+    return _analysis(row)
 
 
 @router.post("/{report_id}/analysis", status_code=status.HTTP_202_ACCEPTED)
@@ -98,11 +127,9 @@ def request_analysis(
             detail="This report is already waiting for analysis.",
         )
     analysis_id = queue_analysis(db, report_id)
-    row = db.execute(
-        f"select {_COLUMNS} from public.ai_analyses where id = %s", (analysis_id,)
-    ).fetchone()
+    row = db.execute(f"{_SELECT} where a.id = %s", (analysis_id,)).fetchone()
     assert row is not None
     # Commit before waking the worker, so it can see the new analysis.
     db.commit()
     analysis_queue.notify()
-    return Analysis(**row)
+    return _analysis(row)
