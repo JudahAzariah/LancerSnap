@@ -71,4 +71,19 @@ Failure reasons: `timeout`, `unavailable`, `rate_limited`, `not_authorized`,
   analysis is never mistaken for "no suggestion". The response has the fields
   above, with `category` as `{id, name}`, plus `processing_status`, `error`,
   `provider`, `model`, `created_at`, and `completed_at`.
-- Students do not see the analysis (LS-13 adds a labelled category suggestion).
+- **Students** see only the category, in their report details
+  (`GET /reports/{id}`, field `category`): `{name, source, uncertain}`.
+  `source` is `staff` when staff confirmed the category, otherwise
+  `ai_suggestion`, taken from `latest_validated_analysis()`. The app always
+  labels an AI suggestion in words ("AI suggestion … Campus staff will confirm
+  or change it"), and says when the AI was not sure. A category on the report
+  that staff have not confirmed is never shown as confirmed. Students never see
+  the priority, hazard flag, confidence, or details.
+
+## Privacy rule for the prompt
+
+The request contains only the photo (re-encoded without metadata), the note,
+the location name, and the category list. The prompt tells the model never to
+identify anyone: no faces, appearance, clothing, or identity, and no names, ID
+cards, screens, or licence plates; a person who matters to the issue is just
+"a person" (SDD §2.4).

@@ -15,7 +15,12 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { ApiError } from '@/lib/api';
 import { locationTypeLabel } from '@/report/locations';
 import { formatDateTime, statusDescription, statusLabel } from '@/report/status';
-import { fetchPhotoUrl, fetchReport, type ReportDetails } from '@/report/tracking';
+import {
+  fetchPhotoUrl,
+  fetchReport,
+  type ReportCategory,
+  type ReportDetails,
+} from '@/report/tracking';
 import { colors } from '@/theme';
 
 type LoadState =
@@ -104,6 +109,9 @@ export default function ReportDetailsScreen() {
         <Text style={styles.body}>{statusDescription(report.status)}</Text>
       </View>
 
+      {/* Near the top, so it is seen without scrolling past the photo. */}
+      {report.category ? <CategoryField category={report.category} /> : null}
+
       <Text style={styles.label}>Photo</Text>
       {report.media_id ? <ReportPhoto mediaId={report.media_id} /> : <Text style={styles.body}>No photo.</Text>}
 
@@ -134,6 +142,38 @@ export default function ReportDetailsScreen() {
       ))}
       <Text style={styles.meta}>Pull down to refresh.</Text>
     </ScrollView>
+  );
+}
+
+/**
+ * The report's category (LS-13; US-02). An AI suggestion is always labelled
+ * in words as a suggestion that staff may change; it is never shown as fact.
+ */
+function CategoryField({ category }: { category: ReportCategory }) {
+  if (category.source === 'staff') {
+    return (
+      <View accessible accessibilityLabel={`Category: ${category.name}, confirmed by campus staff`}>
+        <Text style={styles.label}>Category</Text>
+        <Text style={styles.value}>{category.name}</Text>
+        <Text style={styles.meta}>Confirmed by campus staff.</Text>
+      </View>
+    );
+  }
+  const explanation = category.uncertain
+    ? 'The AI was not sure about this. Campus staff will confirm or change it.'
+    : 'Campus staff will confirm or change it.';
+  return (
+    <View
+      accessible
+      accessibilityLabel={`Category: ${category.name}. AI suggestion. ${explanation}`}
+    >
+      <Text style={styles.label}>Category</Text>
+      <View style={styles.categoryRow}>
+        <Text style={styles.aiTag}>AI suggestion</Text>
+        <Text style={styles.value}>{category.name}</Text>
+      </View>
+      <Text style={styles.meta}>{explanation}</Text>
+    </View>
   );
 }
 
@@ -236,6 +276,18 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.border,
   },
   historyStatus: { fontSize: 16, fontWeight: '700', color: colors.text },
+  categoryRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  aiTag: {
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+  },
   error: {
     padding: 12,
     borderRadius: 8,

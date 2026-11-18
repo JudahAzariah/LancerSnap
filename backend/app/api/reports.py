@@ -12,13 +12,13 @@ by a background worker (LS-11). The AI service is never contacted here.
 """
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, StringConstraints
 
-from app.analysis import Queue, queue_analysis
+from app.analysis import Queue, latest_validated_analysis, queue_analysis
 from app.api.reference import Location, require_active_location
 from app.authz import CurrentProfile, Profile, Role, can_view_report, require_roles
 from app.db import Db
@@ -158,10 +158,21 @@ class StatusChange(BaseModel):
     created_at: datetime
 
 
+class ReportCategory(BaseModel):
+    name: str
+    # "staff": confirmed by campus staff. "ai_suggestion": suggested by AI only,
+    # not confirmed; must be shown labelled as an AI suggestion (US-02).
+    source: Literal["staff", "ai_suggestion"]
+    # For an AI suggestion: the AI itself was not sure (RC-02). Always false for staff.
+    uncertain: bool
+
+
 class ReportDetails(ReportSummary):
     note: str | None
     # The report's photo, viewable through GET /media/{id}/url.
     media_id: UUID | None
+    # Null until staff confirm a category or the AI suggests one.
+    category: ReportCategory | None
     # Oldest first. Who made each change is not shown to the student.
     history: list[StatusChange]
 
@@ -247,5 +258,32 @@ def get_report(report_id: UUID, profile: CurrentProfile, db: Db) -> ReportDetail
         updated_at=row["updated_at"],
         note=row["note"],
         media_id=media["id"] if media else None,
+        category=_report_category(db, report_id),
         history=[StatusChange(**change) for change in history],
+    )
+
+
+def _report_category(db: Db, report_id: UUID) -> ReportCategory | None:
+    """The staff-confirmed category if there is one, otherwise the AI's suggestion."""
+    confirmed = db.execute(
+        """
+        select c.name from public.reports r join public.categories c on c.id = r.category_id
+        where r.id = %s and r.category_confirmed_by is not null
+        """,
+        (report_id,),
+    ).fetchone()
+    if confirmed is not None:
+        return ReportCategory(name=confirmed["name"], source="staff", uncertain=False)
+
+    # Only validated AI output is ever shown (LS-12).
+    analysis = latest_validated_analysis(db, report_id)
+    if analysis is None or analysis.category_id is None:
+        return None
+    suggested = db.execute(
+        "select name from public.categories where id = %s", (analysis.category_id,)
+    ).fetchone()
+    if suggested is None:
+        return None
+    return ReportCategory(
+        name=suggested["name"], source="ai_suggestion", uncertain=analysis.uncertain
     )
