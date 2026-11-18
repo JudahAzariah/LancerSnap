@@ -222,9 +222,38 @@ over a category-wide rule. Routing sets `assigned_team_id` (a team, never a
 person), records the category used (still unconfirmed), moves the report to
 `assigned`, and adds a system `status_history` entry with no actor and no
 note, so the student sees "Assigned" without being told which team. Reports
-that are uncertain, failed, unanalyzed, or match no rule stay `submitted` for
-the manual-review fallback (LS-17). Routing never moves a report that is
-already assigned, and a routing failure never affects the analysis.
+that are uncertain, failed, unanalyzed, or match no rule go to manual review
+(below). Routing never moves a report that a person has already handled, and
+a routing failure never affects the analysis.
+
+## Manual review (LS-17)
+
+`20261119010000_manual_review.sql` adds:
+
+- `teams.is_manual_review`: the one team (at most) that receives reports the
+  AI could not route. Seeded as "Manual review (example, unverified)"
+  (project-owner decision); administrators move the mark in Routing settings
+  or with `PATCH /admin/teams/{id}` `{"is_manual_review": true}`.
+- `reports.review_reason`: why a report is in review: `ai_failed`,
+  `ai_unavailable` (AI off or never ran), `uncertain`, `no_category`, or
+  `no_matching_rule`. Staff-facing; the backend never shows it to students.
+  It is cleared when the report leaves review.
+
+A report in review is assigned to the review team (status `assigned`, so the
+student sees "Assigned" and nothing about review). If no active review team
+is configured, it stays unassigned with its reason, and administrators still
+see it. Nothing is lost.
+
+- **Queue:** `GET /review-queue` lists reports in review, with the reason and
+  the AI's suggestion, for administrators and staff on the team the report is
+  assigned to (the review team). Students get 403.
+- **Routing by a person:** `POST /reports/{id}/route` with a category and a
+  team. The category becomes staff-confirmed, the review reason is cleared,
+  and automatic routing never moves the report again. Reviewers pick teams
+  from `GET /teams` (active teams, not the review team).
+- **Retry:** a failed analysis can be sent again (`POST /reports/{id}/analysis`).
+  While a report sits in review untouched by a person, a confident retry
+  routes it out of review automatically.
 - **Manual-review routing** (LS-17) and any further columns will be added by
   later migrations rather than guessed now.
 

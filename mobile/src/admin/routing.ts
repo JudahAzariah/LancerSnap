@@ -11,6 +11,8 @@ export type Team = {
   name: string;
   description: string | null;
   is_active: boolean;
+  /** Receives reports the AI could not route (LS-17). At most one team. */
+  is_manual_review: boolean;
   member_count: number;
 };
 
@@ -63,7 +65,10 @@ export function createTeam(name: string): Promise<Team> {
   return apiPost<Team>('/admin/teams', { name });
 }
 
-export function updateTeam(id: string, changes: { is_active?: boolean }): Promise<Team> {
+export function updateTeam(
+  id: string,
+  changes: { is_active?: boolean; is_manual_review?: boolean },
+): Promise<Team> {
   return apiPatch<Team>(`/admin/teams/${encodeURIComponent(id)}`, changes);
 }
 

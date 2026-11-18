@@ -84,19 +84,25 @@ export default function HomeScreen() {
                   <EmergencyNotice />
                 </View>
               </View>
-            ) : profile.profile.role === 'administrator' ? (
+            ) : (
               <View style={styles.section}>
                 <Button
-                  label="Routing settings"
-                  accessibilityHint="Choose which team receives each category of report"
-                  onPress={() => router.push('/admin/routing')}
+                  label="Manual review"
+                  accessibilityHint="Reports the AI could not route, waiting for a person"
+                  onPress={() => router.push('/review')}
                 />
+                {profile.profile.role === 'administrator' ? (
+                  <View style={styles.gap}>
+                    <Button
+                      label="Routing settings"
+                      accessibilityHint="Choose which team receives each category of report"
+                      onPress={() => router.push('/admin/routing')}
+                      variant="secondary"
+                    />
+                  </View>
+                ) : null}
                 <Text style={styles.helper}>Other staff tools are not available in the app yet.</Text>
               </View>
-            ) : (
-              <Text style={styles.section}>
-                Staff and administrator tools are not available in the app yet.
-              </Text>
             )}
           </>
         ) : null}

@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from app import db as app_db
 from app.ai.mock import MockProvider, mock_output
-from app.routing import NotRouted, Routed, find_rule, route_report
+from app.routing import InReview, NotRouted, Routed, find_rule, route_report
 from tests.conftest import FakeStorage, auth_as, create_location, create_team, create_user
 from tests.test_analysis import run_once, submit
 from tests.test_analysis_schema import add_category
@@ -132,15 +132,13 @@ def test_a_confident_matching_report_is_assigned_to_the_team(db: Db) -> None:
 @pytest.mark.parametrize(
     ("setup", "reason"),
     [
-        ("no_analysis", "no_analysis"),
+        ("no_analysis", "ai_unavailable"),
         ("uncertain", "uncertain"),
         ("no_category", "uncertain"),
         ("no_rule", "no_matching_rule"),
     ],
 )
-def test_reports_that_cannot_be_routed_are_left_for_manual_review(
-    db: Db, setup: str, reason: str
-) -> None:
+def test_reports_that_cannot_be_routed_go_to_manual_review(db: Db, setup: str, reason: str) -> None:
     lighting, plumbing = add_category(db, "Lighting"), add_category(db, "Plumbing")
     add_rule(db, lighting, create_team(db))
     location = create_location(db)
@@ -154,9 +152,15 @@ def test_reports_that_cannot_be_routed_are_left_for_manual_review(
             (None if setup == "no_category" else lighting, report),
         )
 
-    assert route(report) == NotRouted(reason)
+    # No review team is configured here: the report stays unassigned, with its reason
+    # (LS-17; see test_manual_review.py for the review team).
+    assert route(report) == InReview(reason=reason, team_id=None)
     row = report_row(db, report)
     assert (row["status"], row["assigned_team_id"]) == ("submitted", None)
+    stored = db.execute(
+        "select review_reason from public.reports where id = %s", (report,)
+    ).fetchone()
+    assert stored["review_reason"] == reason
     assert db.execute("select count(*) as n from public.status_history").fetchone()["n"] == 0
 
 
