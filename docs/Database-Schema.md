@@ -61,7 +61,9 @@ erDiagram
   new row; the newest row is the current result. Nothing in the schema lets an
   AI row change a report's status. A row starts `pending` (queued with the
   report), then becomes `succeeded` or `failed`; a failure keeps a short reason
-  in `error_message` (for example `timeout`) and no result (LS-11).
+  in `error_message` (for example `timeout`) and no result (LS-11). The fields
+  of a result and how they are validated are described in
+  [AI-Analysis-Schema.md](AI-Analysis-Schema.md) (LS-12).
 - **Duplicate suggestions are non-destructive** (RC-06). A
   `duplicate_candidates` row only links two reports and records the staff
   disposition (`pending`, `confirmed_duplicate`, `not_duplicate`).

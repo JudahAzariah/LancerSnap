@@ -18,13 +18,16 @@ import threading
 import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from typing import Annotated, Any, Protocol
 from uuid import UUID
 
 from fastapi import Depends
+from psycopg.types.json import Jsonb
 
 from app.ai import AIProvider, AIProviderError, AnalysisOutput, AnalysisRequest
 from app.ai.images import prepare_image
+from app.ai.provider import CategoryOption
 from app.db import Connection
 from app.storage import MediaStorage, StorageError
 
@@ -76,8 +79,10 @@ def process_next(
             return None
 
         analysis_id = UUID(str(row["id"]))
+        categories = active_categories(db)
         try:
-            output = _analyze(row, provider, storage, max_attempts, sleep)
+            output = _analyze(row, categories, provider, storage, max_attempts, sleep)
+            category_id = resolve_category(output, categories)
         except AIProviderError as error:
             logger.warning("AI analysis %s failed: %s", analysis_id, error.code)
             db.execute(
@@ -93,17 +98,56 @@ def process_next(
             db.execute(
                 """
                 update public.ai_analyses
-                set processing_status = 'succeeded', summary = %s, error_message = null,
+                set processing_status = 'succeeded', error_message = null,
+                    suggested_category_id = %s, summary = %s, details = %s,
+                    suggested_priority = %s, is_potential_safety_hazard = %s,
+                    confidence = %s, is_uncertain = %s, uncertainty_reason = %s,
                     provider = %s, model = %s, completed_at = now()
                 where id = %s
                 """,
-                (output.summary, provider.name, provider.model, analysis_id),
+                (
+                    category_id,
+                    output.summary,
+                    Jsonb(output.details),
+                    output.priority,
+                    output.potential_safety_hazard,
+                    round(output.confidence, 3),
+                    output.uncertain,
+                    output.uncertainty_reason,
+                    provider.name,
+                    provider.model,
+                    analysis_id,
+                ),
             )
     return analysis_id
 
 
+def active_categories(db: Connection) -> tuple[CategoryOption, ...]:
+    """The categories the AI may suggest: active, administrator-configured ones (LS-05)."""
+    rows = db.execute(
+        "select id, name, description from public.categories where is_active order by name"
+    ).fetchall()
+    return tuple(CategoryOption(**row) for row in rows)
+
+
+def resolve_category(output: AnalysisOutput, offered: tuple[CategoryOption, ...]) -> UUID | None:
+    """Map the suggested category name to an offered category, or reject the result.
+
+    Done here, outside any provider, so no provider can store a category that
+    was not on the active list. "No category fits" (null) is allowed only
+    because the schema forces such a result to be marked uncertain.
+    """
+    if output.category is None:
+        return None
+    for option in offered:
+        if option.name == output.category:
+            return option.id
+    raise AIProviderError("unsupported_category", retryable=False)
+
+
 def _analyze(
     row: dict[str, Any],
+    categories: tuple[CategoryOption, ...],
     provider: AIProvider,
     storage: MediaStorage,
     max_attempts: int,
@@ -117,7 +161,7 @@ def _analyze(
     for attempt in range(1, attempts + 1):
         try:
             if request is None:
-                request = _build_request(row, storage)
+                request = _build_request(row, categories, storage)
             return provider.analyze(request)
         except AIProviderError as error:
             if not error.retryable or attempt == attempts:
@@ -126,7 +170,9 @@ def _analyze(
     raise AssertionError("unreachable")
 
 
-def _build_request(row: dict[str, Any], storage: MediaStorage) -> AnalysisRequest:
+def _build_request(
+    row: dict[str, Any], categories: tuple[CategoryOption, ...], storage: MediaStorage
+) -> AnalysisRequest:
     try:
         original = storage.download(row["object_path"])
     except StorageError as error:
@@ -137,7 +183,54 @@ def _build_request(row: dict[str, Any], storage: MediaStorage) -> AnalysisReques
         image_media_type=media_type,
         note=row["note"],
         location_name=row["location_name"],
+        categories=categories,
     )
+
+
+# --- Reading validated results ---------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ValidatedAnalysis:
+    """A successful, schema-validated AI analysis. Advisory only (RC-02, RC-03)."""
+
+    id: UUID
+    report_id: UUID
+    category_id: UUID | None
+    summary: str
+    details: list[str]
+    priority: str
+    potential_safety_hazard: bool
+    confidence: float
+    uncertain: bool
+    uncertainty_reason: str | None
+
+
+def latest_validated_analysis(db: Connection, report_id: UUID) -> ValidatedAnalysis | None:
+    """The newest successful analysis of a report, or None.
+
+    The one place later stages (routing, LS-16) read AI results from. Only
+    `succeeded` rows are ever returned, and only those hold AI output: pending
+    and failed attempts store no suggestion, so nothing invalid can reach
+    downstream logic (Implementation Plan, Critical Dependency Rule 4).
+    """
+    row = db.execute(
+        """
+        select id, report_id, suggested_category_id as category_id, summary, details,
+               suggested_priority::text as priority,
+               is_potential_safety_hazard as potential_safety_hazard,
+               confidence::float8 as confidence, is_uncertain as uncertain, uncertainty_reason
+        from public.ai_analyses
+        where report_id = %s and processing_status = 'succeeded'
+          -- Summary-only results from before the LS-12 schema are not complete results.
+          and suggested_priority is not null and is_potential_safety_hazard is not null
+          and confidence is not null and details is not null
+        order by created_at desc, id desc
+        limit 1
+        """,
+        (report_id,),
+    ).fetchone()
+    return ValidatedAnalysis(**row) if row else None
 
 
 # --- Background worker ---------------------------------------------------------

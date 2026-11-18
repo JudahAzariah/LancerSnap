@@ -8,7 +8,6 @@ import base64
 import io
 import json
 import time
-from collections.abc import Iterator
 from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
@@ -24,13 +23,13 @@ from app import db as app_db
 from app.ai import ProviderNotConfigured, get_provider
 from app.ai.claude import ClaudeProvider
 from app.ai.images import MAX_EDGE_PIXELS, prepare_image
-from app.ai.mock import MockProvider, always_fail
-from app.ai.provider import AIProviderError, AnalysisOutput, AnalysisRequest, parse_output
-from app.analysis import AnalysisWorker, get_analysis_queue, process_next
+from app.ai.mock import MockProvider, always_fail, mock_output
+from app.ai.provider import AIProviderError, AnalysisOutput, AnalysisRequest, CategoryOption
+from app.analysis import AnalysisWorker, process_next
 from app.config import Settings
-from app.main import app
 from tests.conftest import (
     FakeStorage,
+    RecordingQueue,
     add_member,
     auth_as,
     create_location,
@@ -52,31 +51,6 @@ def jpeg(width: int = 64, height: int = 48, *, with_gps: bool = False) -> bytes:
     else:
         image.save(output, format="JPEG")
     return output.getvalue()
-
-
-class RecordingQueue:
-    """Analysis turned on, with notifications recorded instead of a worker."""
-
-    enabled = True
-
-    def __init__(self, db: Db) -> None:
-        self._db = db
-        self.pending_seen_at_notify: list[int] = []
-
-    def notify(self) -> None:
-        # `db` is a separate autocommit connection: it only sees committed rows.
-        row = self._db.execute(
-            "select count(*) as n from public.ai_analyses where processing_status = 'pending'"
-        ).fetchone()
-        assert row is not None
-        self.pending_seen_at_notify.append(int(row["n"]))
-
-
-@pytest.fixture
-def queue(client: TestClient, db: Db) -> Iterator[RecordingQueue]:
-    recording = RecordingQueue(db)
-    app.dependency_overrides[get_analysis_queue] = lambda: recording
-    yield recording
 
 
 def submit(client: TestClient, db: Db, storage: FakeStorage, *, note: str | None = None) -> dict:
@@ -144,23 +118,7 @@ def test_unknown_provider_is_a_configuration_error() -> None:
         get_provider(Settings(_env_file=None, ai_provider="something-else"))
 
 
-# --- Output validation ----------------------------------------------------------
-
-
-def test_provider_output_is_validated_against_the_schema() -> None:
-    assert parse_output('{"summary": "Broken light."}').summary == "Broken light."
-    for bad in ["not json", "[]", "{}", '{"summary": ""}', '{"summary": "x", "extra": 1}']:
-        with pytest.raises(AIProviderError) as raised:
-            parse_output(bad)
-        assert raised.value.code == "invalid_response"
-        assert not raised.value.retryable
-
-
-def test_overlong_summary_is_rejected() -> None:
-    with pytest.raises(AIProviderError):
-        parse_output(json.dumps({"summary": "x" * 501}))
-    # A long but reasonable sentence (like a real 349-character reply) is kept.
-    assert len(parse_output(json.dumps({"summary": "x" * 349})).summary) == 349
+# Output validation is covered in test_analysis_schema.py (LS-12).
 
 
 # --- Image preparation ------------------------------------------------------------
@@ -188,7 +146,14 @@ def test_unreadable_photo_is_not_retried() -> None:
 
 
 REQUEST = AnalysisRequest(
-    image=b"\xff\xd8jpeg", image_media_type="image/jpeg", note="Water on floor", location_name="Gym"
+    image=b"\xff\xd8jpeg",
+    image_media_type="image/jpeg",
+    note="Water on floor",
+    location_name="Gym",
+    categories=(
+        CategoryOption(id=UUID(int=1), name="Spills", description="Liquid on floors"),
+        CategoryOption(id=UUID(int=2), name="Lighting", description=None),
+    ),
 )
 _HTTP_REQUEST = httpx2.Request("POST", "https://api.anthropic.test/v1/messages")
 
@@ -226,16 +191,35 @@ def message(text: str, stop_reason: str = "end_turn") -> Any:
     )
 
 
+VALID_REPLY = json.dumps(
+    {
+        "category": "Spills",
+        "summary": "Water pooled on the gym floor.",
+        "details": ["Puddle near the entrance"],
+        "priority": "medium",
+        "potential_safety_hazard": True,
+        "confidence": 0.8,
+        "uncertain": False,
+        "uncertainty_reason": None,
+    }
+)
+
+
 def test_claude_success_sends_only_approved_content() -> None:
-    provider, messages = claude_with(message('{"summary": "Water pooled on the gym floor."}'))
+    provider, messages = claude_with(message(VALID_REPLY))
     assert provider.analyze(REQUEST).summary == "Water pooled on the gym floor."
 
     (params,) = messages.calls
     assert params["model"] == "claude-opus-5-5"
-    assert params["output_config"]["format"]["type"] == "json_schema"
+    output_format = params["output_config"]["format"]
+    assert output_format["type"] == "json_schema"
+    # The category is constrained to the offered, active categories.
+    category_schema = output_format["schema"]["properties"]["category"]["anyOf"][0]
+    assert category_schema["enum"] == ["Spills", "Lighting"]
     image, text = params["messages"][0]["content"]
     assert image["source"]["data"] == base64.standard_b64encode(REQUEST.image).decode()
     assert '"Gym"' in text["text"] and '"Water on floor"' in text["text"]
+    assert '"Spills": Liquid on floors' in text["text"]
 
 
 @pytest.mark.parametrize(
@@ -352,11 +336,11 @@ def test_a_temporary_failure_then_success_is_a_success(
     receipt = submit(client, db, storage)
     outcomes = iter([AIProviderError("timeout", retryable=True), None])
 
-    def flaky(_: AnalysisRequest) -> AnalysisOutput:
+    def flaky(request: AnalysisRequest) -> AnalysisOutput:
         outcome = next(outcomes)
         if outcome is not None:
             raise outcome
-        return AnalysisOutput(summary="Recovered.")
+        return mock_output(request, summary="Recovered.")
 
     run_once(MockProvider(flaky), storage)
     (row,) = analyses(db, receipt["id"])

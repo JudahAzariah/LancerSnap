@@ -28,7 +28,23 @@ class MockProvider:
         self.requests.append(request)
         if self._behavior is not None:
             return self._behavior(request)
-        return AnalysisOutput(summary=f"[Mock analysis] Reported issue at {request.location_name}.")
+        return mock_output(request)
+
+
+def mock_output(request: AnalysisRequest, **overrides: object) -> AnalysisOutput:
+    """A valid, clearly fake result. Always marked uncertain: it is not a real classification."""
+    values: dict[str, object] = {
+        "category": request.categories[0].name if request.categories else None,
+        "summary": f"[Mock analysis] Reported issue at {request.location_name}.",
+        "details": ["Mock result: no AI service was called."],
+        "priority": "low",
+        "potential_safety_hazard": False,
+        "confidence": 0.0,
+        "uncertain": True,
+        "uncertainty_reason": "Mock analysis for development; not a real classification.",
+    }
+    values.update(overrides)
+    return AnalysisOutput.model_validate(values)
 
 
 def always_fail(code: str, *, retryable: bool) -> Callable[[AnalysisRequest], AnalysisOutput]:

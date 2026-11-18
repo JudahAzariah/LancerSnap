@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient
 from psycopg.rows import dict_row
 
 from app import db as app_db
+from app.analysis import get_analysis_queue
 from app.auth import TokenVerifier, get_token_verifier
 from app.config import Settings
 from app.main import app
@@ -239,6 +240,31 @@ class FakeStorage:
             raise StorageError("simulated outage")
         self.download_requests.append((object_path, expires_in))
         return f"https://storage.test/download/{object_path}?token=signed"
+
+
+class RecordingQueue:
+    """AI analysis turned on, with notifications recorded instead of a worker."""
+
+    enabled = True
+
+    def __init__(self, db: psycopg.Connection[Any]) -> None:
+        self._db = db
+        self.pending_seen_at_notify: list[int] = []
+
+    def notify(self) -> None:
+        # `db` is a separate autocommit connection: it only sees committed rows.
+        row = self._db.execute(
+            "select count(*) as n from public.ai_analyses where processing_status = 'pending'"
+        ).fetchone()
+        assert row is not None
+        self.pending_seen_at_notify.append(int(row["n"]))
+
+
+@pytest.fixture
+def queue(client: TestClient, db: psycopg.Connection[Any]) -> RecordingQueue:
+    recording = RecordingQueue(db)
+    app.dependency_overrides[get_analysis_queue] = lambda: recording
+    return recording
 
 
 @pytest.fixture
