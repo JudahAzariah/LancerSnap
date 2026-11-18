@@ -1,10 +1,14 @@
 // LS-05: seeded campus locations and report categories.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { before, describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { asUser, createDatabase, createUser } from './helpers.mjs';
 
 const STUDENT = '00000000-0000-0000-0000-000000000001';
+const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'migrations');
 
 const EXPECTED_LOCATIONS = [
   'Academic Quad',
@@ -105,13 +109,11 @@ describe('report categories', () => {
 });
 
 describe('scope', () => {
-  it('creates no teams or routing rules', async () => {
-    const [counts] = (
-      await db.query(
-        `select (select count(*)::int from teams) as teams,
-                (select count(*)::int from routing_rules) as rules`,
-      )
-    ).rows;
-    assert.deepEqual(counts, { teams: 0, rules: 0 });
+  it('creates no teams or routing rules (those are LS-16 configuration)', () => {
+    const sql = readFileSync(
+      join(MIGRATIONS_DIR, '20261116020000_locations_and_categories.sql'),
+      'utf8',
+    );
+    assert.doesNotMatch(sql, /insert\s+into\s+(public\.)?(teams|routing_rules)/i);
   });
 });

@@ -14,6 +14,7 @@ export default function AppLayout() {
           <Stack.Screen name="report/review" options={{ title: 'Review' }} />
           <Stack.Screen name="my-reports" options={{ title: 'My reports' }} />
           <Stack.Screen name="reports/[id]" options={{ title: 'Report details' }} />
+          <Stack.Screen name="admin/routing" options={{ title: 'Routing settings' }} />
           <Stack.Screen
             name="report/submitted"
             // The report is sent; going back into the finished draft makes no sense.

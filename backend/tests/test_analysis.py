@@ -53,7 +53,14 @@ def jpeg(width: int = 64, height: int = 48, *, with_gps: bool = False) -> bytes:
     return output.getvalue()
 
 
-def submit(client: TestClient, db: Db, storage: FakeStorage, *, note: str | None = None) -> dict:
+def submit(
+    client: TestClient,
+    db: Db,
+    storage: FakeStorage,
+    *,
+    note: str | None = None,
+    location_name: str = "Engineering Building",
+) -> dict:
     student = create_user(db)
     ticket = client.post(
         "/media/uploads",
@@ -66,7 +73,7 @@ def submit(client: TestClient, db: Db, storage: FakeStorage, *, note: str | None
         headers=auth_as(student),
         json={
             "media_id": ticket["media_id"],
-            "location_id": str(create_location(db, "Engineering Building")),
+            "location_id": str(create_location(db, location_name)),
             "note": note,
         },
     )

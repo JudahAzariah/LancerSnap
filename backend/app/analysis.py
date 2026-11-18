@@ -125,8 +125,30 @@ def process_next(
                 ),
             )
         # With the category known (or not), look for possible duplicates (LS-15).
-        (find_duplicates or safe_detect_duplicates)(db, UUID(str(row["report_id"])))
+        report_id = UUID(str(row["report_id"]))
+        (find_duplicates or safe_detect_duplicates)(db, report_id)
+        # Send it to a team if the result is confident and a rule matches (LS-16).
+        safe_route_report(db, report_id)
     return analysis_id
+
+
+def safe_route_report(db: Connection, report_id: UUID) -> object:
+    """Routing that can never undo or block the analysis.
+
+    It runs in a savepoint: if it fails, the report simply stays unrouted for
+    manual review (LS-17), and the failure is logged.
+    """
+    from app.routing import NotRouted, route_report  # Avoids an import cycle.
+
+    try:
+        with db.transaction():
+            outcome = route_report(db, report_id)
+    except Exception:
+        logger.exception("Routing failed for report %s", report_id)
+        return None
+    if isinstance(outcome, NotRouted):
+        logger.info("Report %s not routed: %s", report_id, outcome.reason)
+    return outcome
 
 
 def safe_detect_duplicates(
