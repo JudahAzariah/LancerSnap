@@ -53,6 +53,10 @@ class MediaStorage(Protocol):
         """The stored object's real size and type, or None if nothing was uploaded."""
         ...
 
+    def download(self, object_path: str) -> bytes:
+        """The object's bytes, for server-side processing (AI analysis)."""
+        ...
+
 
 class SupabaseStorage:
     """Supabase Storage REST client for one private bucket."""
@@ -119,6 +123,20 @@ class SupabaseStorage:
             raise StorageError("Unexpected storage response") from error
         return StoredObject(size_bytes=size, content_type=content_type.lower())
 
+    def download(self, object_path: str) -> bytes:
+        try:
+            response = httpx.get(
+                f"{self._base}/object/authenticated/{self._object(object_path)}",
+                headers=self._headers,
+                timeout=30,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError as error:
+            raise StorageError(type(error).__name__) from error
+        if len(response.content) > MAX_UPLOAD_BYTES:
+            raise StorageError("Stored object is larger than allowed")
+        return response.content
+
 
 def _is_not_found(response: httpx.Response) -> bool:
     """Supabase Storage reports a missing object as HTTP 400 with a not-found body."""
@@ -135,17 +153,24 @@ def _is_not_found(response: httpx.Response) -> bool:
     )
 
 
-def get_storage(settings: Annotated[Settings, Depends(get_settings)]) -> MediaStorage:
+def storage_from_settings(settings: Settings) -> MediaStorage | None:
     if not settings.supabase_url or not settings.supabase_secret_key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Photo storage is not configured",
-        )
+        return None
     return SupabaseStorage(
         supabase_url=settings.supabase_url,
         secret_key=settings.supabase_secret_key,
         bucket=settings.report_media_bucket,
     )
+
+
+def get_storage(settings: Annotated[Settings, Depends(get_settings)]) -> MediaStorage:
+    storage = storage_from_settings(settings)
+    if storage is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Photo storage is not configured",
+        )
+    return storage
 
 
 Storage = Annotated[MediaStorage, Depends(get_storage)]

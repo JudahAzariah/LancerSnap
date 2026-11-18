@@ -203,12 +203,25 @@ class FakeStorage:
         self.download_requests: list[tuple[str, int]] = []
         # Files that have actually been "uploaded", by object path.
         self.objects: dict[str, StoredObject] = {}
+        self.contents: dict[str, bytes] = {}
 
     def put(
-        self, object_path: str, size_bytes: int = 1000, content_type: str = "image/jpeg"
+        self,
+        object_path: str,
+        size_bytes: int = 1000,
+        content_type: str = "image/jpeg",
+        data: bytes | None = None,
     ) -> None:
         """Simulate the client sending the file through its signed upload link."""
+        if data is not None:
+            size_bytes = len(data)
+            self.contents[object_path] = data
         self.objects[object_path] = StoredObject(size_bytes=size_bytes, content_type=content_type)
+
+    def download(self, object_path: str) -> bytes:
+        if self.fail or object_path not in self.contents:
+            raise StorageError("simulated outage")
+        return self.contents[object_path]
 
     def get_object(self, object_path: str) -> StoredObject | None:
         if self.fail:
