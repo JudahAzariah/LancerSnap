@@ -15,7 +15,17 @@ from app.analysis import (
     safe_detect_duplicates,
     set_analysis_queue,
 )
-from app.api import admin_users, analysis, duplicates, health, me, media, reference, reports
+from app.api import (
+    admin_routing,
+    admin_users,
+    analysis,
+    duplicates,
+    health,
+    me,
+    media,
+    reference,
+    reports,
+)
 from app.config import Settings, get_settings
 from app.storage import storage_from_settings
 
@@ -77,6 +87,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(me.router)
     app.include_router(admin_users.router)
+    app.include_router(admin_routing.router)
     app.include_router(reference.router)
     app.include_router(reference.admin_router)
     app.include_router(media.router)

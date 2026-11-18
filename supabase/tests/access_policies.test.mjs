@@ -25,8 +25,10 @@ async function visibleIds(userId, table) {
 
 before(async () => {
   db = await createDatabase();
-  // Start from empty reference data so the counts below are exact.
-  await db.exec('delete from locations; delete from categories;');
+  // Start from empty reference and routing data so the counts below are exact.
+  await db.exec(
+    'delete from routing_rules; delete from teams; delete from locations; delete from categories;',
+  );
   for (const id of [STUDENT_A, STUDENT_B, STAFF_ONE, STAFF_TWO, FORMER_STAFF, ADMIN]) {
     await createUser(db, id);
   }

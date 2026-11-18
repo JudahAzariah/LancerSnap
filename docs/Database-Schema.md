@@ -201,8 +201,30 @@ where id = (select id from auth.users where email = 'you@example.edu');
   choice that can be changed by a later migration.
 - **`closed` exists as a status value only.** How a report reaches `closed`
   is an open decision (SDD §6.4) to be made before LS-20.
-- **Teams and routing rules are not seeded.** They are configuration pending
-  CBU validation (OQ-01) and are managed through LS-16.
+- **Teams and routing rules are unverified examples.**
+  `20261119000000_example_routing.sql` (LS-16) seeds the five example teams
+  named in SDD §1.3, each called "(example, unverified)", and four
+  category-wide example rules: Facilities / maintenance → Facilities,
+  Housing / residential → Housing / Residential Assistants, Dining or campus
+  service-location → Dining, IT / technology → IT / Technology Support.
+  "Potential safety hazard" and "Other supported campus issue" have no rule,
+  so they go to manual review. None of this is confirmed CBU ownership
+  (OQ-01); administrators change it in the app (Routing settings) or through
+  `/admin/teams` and `/admin/routing-rules`.
+
+## Routing (LS-16)
+
+`backend/app/routing.py` runs after each AI analysis. A report is routed when
+it is still `submitted` with no team, its newest validated analysis is
+**confident** (has a category, not uncertain), and an active rule for that
+category matches at an active team. A rule for the report's own location wins
+over a category-wide rule. Routing sets `assigned_team_id` (a team, never a
+person), records the category used (still unconfirmed), moves the report to
+`assigned`, and adds a system `status_history` entry with no actor and no
+note, so the student sees "Assigned" without being told which team. Reports
+that are uncertain, failed, unanalyzed, or match no rule stay `submitted` for
+the manual-review fallback (LS-17). Routing never moves a report that is
+already assigned, and a routing failure never affects the analysis.
 - **Manual-review routing** (LS-17) and any further columns will be added by
   later migrations rather than guessed now.
 

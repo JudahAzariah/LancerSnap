@@ -256,11 +256,11 @@ Do not implement downstream behavior before its required data contract and autho
 
 ## 10. Open Architecture Decisions
 
-The following decisions are intentionally not made by this file because the SDD identifies them as open. Decisions since made by the project owner are marked in the table:
+The following decisions are intentionally not made by this file because the SDD identifies them as open. Decisions and interim choices since made by the project owner are marked in the table:
 
 | SDD reference | Open decision | Rule for implementation agents |
 |---|---|---|
-| OQ-01 | CBU team and category routing | Do not invent official team ownership. Use configurable placeholder/reference data until validated. |
+| OQ-01 | CBU team and category routing | Do not invent official team ownership. Use configurable placeholder/reference data until validated. **LS-16 (project owner, 2026-11-18):** the SDD §1.3 example teams and four example category rules are seeded, every one named "(example, unverified)"; still open until CBU validates. |
 | OQ-02 | Staff workflow integration | Do not assume full integration with existing CBU systems; implement only the approved MVP workflow. |
 | OQ-03 | AI provider and model | **Decided by the project owner (2026-11-16): Claude via the Anthropic API.** The provider stays behind the adapter in `backend/app/ai/` (only `claude.py` imports the SDK); the model is configuration (`AI_MODEL`, default `claude-haiku-5-5` for cost, chosen 2026-11-18), and the key is server-side only (`ANTHROPIC_API_KEY`). Switching providers means adding another adapter. |
 | OQ-04 | Duplicate detection approach | Evaluate category, location, time, and text first; image similarity is conditional on need and feasibility. |
