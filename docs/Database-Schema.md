@@ -180,6 +180,10 @@ directly with a user's token, the policies in
   administrators. All writes go through the backend.
 - A user counts as staff for a team only while their role is `staff` **and**
   they have a membership row; removing the staff role removes the scope.
+- The staff queue (`GET /staff/queue`, LS-18) applies the same rule: staff see
+  reports assigned to their teams, administrators see every report, students
+  get 403. It can be filtered by status, priority, and safety hazards, and
+  sorted by priority (hazards first), newest, or oldest.
 - The policy helper functions live in a non-exposed `private` schema.
 
 ### Roles and the first administrator

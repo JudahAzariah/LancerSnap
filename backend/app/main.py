@@ -26,6 +26,7 @@ from app.api import (
     reference,
     reports,
     review,
+    staff,
 )
 from app.config import Settings, get_settings
 from app.storage import storage_from_settings
@@ -96,6 +97,7 @@ def create_app() -> FastAPI:
     app.include_router(analysis.router)
     app.include_router(duplicates.router)
     app.include_router(review.router)
+    app.include_router(staff.router)
     return app
 
 

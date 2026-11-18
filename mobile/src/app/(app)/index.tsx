@@ -87,10 +87,19 @@ export default function HomeScreen() {
             ) : (
               <View style={styles.section}>
                 <Button
-                  label="Manual review"
-                  accessibilityHint="Reports the AI could not route, waiting for a person"
-                  onPress={() => router.push('/review')}
+                  large
+                  label="Staff queue"
+                  accessibilityHint="Reports in your team queues"
+                  onPress={() => router.push('/staff')}
                 />
+                <View style={styles.gap}>
+                  <Button
+                    label="Manual review"
+                    accessibilityHint="Reports the AI could not route, waiting for a person"
+                    onPress={() => router.push('/review')}
+                    variant="secondary"
+                  />
+                </View>
                 {profile.profile.role === 'administrator' ? (
                   <View style={styles.gap}>
                     <Button
@@ -101,7 +110,6 @@ export default function HomeScreen() {
                     />
                   </View>
                 ) : null}
-                <Text style={styles.helper}>Other staff tools are not available in the app yet.</Text>
               </View>
             )}
           </>
