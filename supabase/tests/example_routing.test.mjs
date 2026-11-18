@@ -26,7 +26,10 @@ before(async () => {
 
 describe('example routing configuration', () => {
   it('seeds the five SDD example teams, each labelled unverified', async () => {
-    const teams = await rows('select name, description, is_active from teams order by name');
+    // The LS-17 manual-review team is tested in manual_review.test.mjs.
+    const teams = await rows(
+      'select name, description, is_active from teams where not is_manual_review order by name',
+    );
     assert.deepEqual(
       teams.map((t) => t.name),
       [
@@ -80,7 +83,9 @@ describe('example routing configuration', () => {
       where category_id = (select id from categories where name = 'Facilities / maintenance issue')`);
     await db.exec(readFileSync(MIGRATION, 'utf8'));
 
-    const [{ teams }] = await rows('select count(*)::int as teams from teams');
+    const [{ teams }] = await rows(
+      'select count(*)::int as teams from teams where not is_manual_review',
+    );
     const [{ rules }] = await rows('select count(*)::int as rules from routing_rules');
     assert.equal(teams, 5);
     assert.equal(rules, 4);

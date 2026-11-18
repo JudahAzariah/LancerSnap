@@ -23,6 +23,7 @@ from app.analysis import (
     latest_validated_analysis,
     queue_analysis,
     safe_detect_duplicates,
+    safe_route_report,
 )
 from app.api.reference import Location, require_active_location
 from app.authz import CurrentProfile, Profile, Role, can_view_report, require_roles
@@ -143,6 +144,12 @@ def submit_report(
             window_hours=settings.duplicate_window_hours,
             text_threshold=settings.duplicate_text_threshold,
         )
+        # Without AI it cannot be routed by rule: it goes to manual review (LS-17).
+        safe_route_report(db, report["id"])
+        current = db.execute(
+            "select status::text as status from public.reports where id = %s", (report["id"],)
+        ).fetchone()
+        report = {**report, "status": current["status"]}
 
     return ReportReceipt(
         id=report["id"],

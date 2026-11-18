@@ -38,8 +38,16 @@ const CONFIG: RoutingConfig = {
     },
   ],
   teams: [
-    { ...FACILITIES, description: null, is_active: true, member_count: 0 },
-    { ...IT, description: null, is_active: true, member_count: 1 },
+    { ...FACILITIES, description: null, is_active: true, is_manual_review: false, member_count: 0 },
+    { ...IT, description: null, is_active: true, is_manual_review: false, member_count: 1 },
+    {
+      id: 't-review',
+      name: 'Manual review (example, unverified)',
+      description: null,
+      is_active: true,
+      is_manual_review: true,
+      member_count: 0,
+    },
   ],
   categories: [
     { id: 'c-fac', name: 'Facilities / maintenance issue', description: null },
@@ -68,7 +76,7 @@ describe('Routing settings', () => {
     expect(await screen.findByText('⚠ Example configuration, not confirmed')).toBeOnTheScreen();
     expect(screen.getByLabelText(`Rule: Facilities / maintenance issue to ${FACILITIES.name}`)).toBeOnTheScreen();
     expect(screen.getByText('Where: All locations')).toBeOnTheScreen();
-    expect(screen.getAllByText(/example, not confirmed/)).toHaveLength(2);
+    expect(screen.getAllByText(/example, not confirmed/)).toHaveLength(3);
     expect(screen.getByText(/● On · 1 member · example/)).toBeOnTheScreen();
   });
 
@@ -130,8 +138,21 @@ describe('Routing settings', () => {
     expect(createTeam).toHaveBeenCalledWith('Grounds');
 
     const offButtons = screen.getAllByRole('button', { name: 'Turn off' });
-    await fireEvent.press(offButtons[offButtons.length - 1]);
+    await fireEvent.press(offButtons[offButtons.length - 2]);
     expect(updateTeam).toHaveBeenCalledWith('t-it', { is_active: false });
+  });
+
+  it('marks the manual-review team and lets another team take that role', async () => {
+    jest.mocked(updateTeam).mockResolvedValue({ ...CONFIG.teams[0] });
+    await render(<RoutingScreen />);
+    expect(
+      await screen.findByText('★ Manual-review team: receives reports the AI could not route'),
+    ).toBeOnTheScreen();
+    // Offered on the two other teams, not on the current review team.
+    const buttons = screen.getAllByRole('button', { name: 'Use for manual review' });
+    expect(buttons).toHaveLength(2);
+    await fireEvent.press(buttons[0]);
+    expect(updateTeam).toHaveBeenCalledWith('t-fac', { is_manual_review: true });
   });
 
   it('is refused to anyone but an administrator', async () => {

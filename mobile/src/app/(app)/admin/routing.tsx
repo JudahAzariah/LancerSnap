@@ -182,6 +182,12 @@ export default function RoutingScreen() {
         <TeamRow
           key={team.id}
           busy={busy}
+          onMakeReviewTeam={() =>
+            run(
+              () => updateTeam(team.id, { is_manual_review: true }),
+              `${team.name} now receives reports for manual review.`,
+            )
+          }
           onToggle={() =>
             run(
               () => updateTeam(team.id, { is_active: !team.is_active }),
@@ -306,7 +312,17 @@ function NewRule({
   );
 }
 
-function TeamRow({ team, busy, onToggle }: { team: Team; busy: boolean; onToggle: () => void }) {
+function TeamRow({
+  team,
+  busy,
+  onToggle,
+  onMakeReviewTeam,
+}: {
+  team: Team;
+  busy: boolean;
+  onToggle: () => void;
+  onMakeReviewTeam: () => void;
+}) {
   const members = `${team.member_count} member${team.member_count === 1 ? '' : 's'}`;
   return (
     <View style={[styles.card, !team.is_active && styles.cardOff]}>
@@ -315,6 +331,9 @@ function TeamRow({ team, busy, onToggle }: { team: Team; busy: boolean; onToggle
         {team.is_active ? '● On' : '○ Off'} · {members}
         {isUnverifiedExample(team.name) ? ' · example, not confirmed' : ''}
       </Text>
+      {team.is_manual_review ? (
+        <Text style={styles.reviewMark}>★ Manual-review team: receives reports the AI could not route</Text>
+      ) : null}
       <View style={styles.actions}>
         <Button
           disabled={busy}
@@ -322,6 +341,14 @@ function TeamRow({ team, busy, onToggle }: { team: Team; busy: boolean; onToggle
           onPress={onToggle}
           variant="secondary"
         />
+        {!team.is_manual_review && team.is_active ? (
+          <Button
+            disabled={busy}
+            label="Use for manual review"
+            onPress={onMakeReviewTeam}
+            variant="secondary"
+          />
+        ) : null}
       </View>
     </View>
   );
@@ -389,6 +416,7 @@ const styles = StyleSheet.create({
   },
   cardOff: { borderStyle: 'dashed' },
   cardTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
+  reviewMark: { marginTop: 4, fontSize: 15, fontWeight: '700', color: colors.text },
   actions: { marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   input: {
     marginTop: 8,

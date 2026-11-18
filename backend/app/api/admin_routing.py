@@ -36,6 +36,7 @@ class Team(BaseModel):
     name: str
     description: str | None
     is_active: bool
+    is_manual_review: bool
     member_count: int
 
 
@@ -48,10 +49,13 @@ class TeamUpdate(BaseModel):
     name: TeamName | None = None
     description: Description | None = None
     is_active: bool | None = None
+    # True: this team receives reports for manual review (LS-17). Only one
+    # team can be the review team; marking one unmarks the others.
+    is_manual_review: bool | None = None
 
 
 _TEAM_SELECT = """
-    select t.id, t.name, t.description, t.is_active,
+    select t.id, t.name, t.description, t.is_active, t.is_manual_review,
            (select count(*)::int from public.team_members m where m.team_id = t.id)
                as member_count
     from public.teams t
@@ -92,13 +96,20 @@ def create_team(body: TeamCreate, admin: AdminProfile, db: Db) -> Team:
 @router.patch("/teams/{team_id}")
 def update_team(team_id: UUID, body: TeamUpdate, admin: AdminProfile, db: Db) -> Team:
     changes = body.model_dump(exclude_none=True)
+    if changes.get("is_manual_review"):
+        # Only one review team: unmark the current one first.
+        db.execute(
+            "update public.teams set is_manual_review = false where is_manual_review and id <> %s",
+            (team_id,),
+        )
     try:
         row = db.execute(
             """
             update public.teams
             set name = coalesce(%(name)s, name),
                 description = coalesce(%(description)s, description),
-                is_active = coalesce(%(is_active)s, is_active)
+                is_active = coalesce(%(is_active)s, is_active),
+                is_manual_review = coalesce(%(is_manual_review)s, is_manual_review)
             where id = %(id)s
             returning id
             """,

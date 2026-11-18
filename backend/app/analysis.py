@@ -138,7 +138,7 @@ def safe_route_report(db: Connection, report_id: UUID) -> object:
     It runs in a savepoint: if it fails, the report simply stays unrouted for
     manual review (LS-17), and the failure is logged.
     """
-    from app.routing import NotRouted, route_report  # Avoids an import cycle.
+    from app.routing import InReview, route_report  # Avoids an import cycle.
 
     try:
         with db.transaction():
@@ -146,8 +146,8 @@ def safe_route_report(db: Connection, report_id: UUID) -> object:
     except Exception:
         logger.exception("Routing failed for report %s", report_id)
         return None
-    if isinstance(outcome, NotRouted):
-        logger.info("Report %s not routed: %s", report_id, outcome.reason)
+    if isinstance(outcome, InReview):
+        logger.info("Report %s sent to manual review: %s", report_id, outcome.reason)
     return outcome
 
 
