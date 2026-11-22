@@ -113,7 +113,7 @@ def _lock_report(db: Connection, report_id: UUID) -> dict[str, object] | None:
     return db.execute(
         """
         select id, status::text as status, assigned_team_id, assigned_to, location_id,
-               review_reason
+               review_reason, category_confirmed_by
         from public.reports where id = %s for update
         """,
         (report_id,),
@@ -122,7 +122,13 @@ def _lock_report(db: Connection, report_id: UUID) -> dict[str, object] | None:
 
 def _waiting_for_routing(report: dict[str, object]) -> bool:
     newly_submitted = report["status"] == "submitted" and report["assigned_team_id"] is None
-    untouched_in_review = report["review_reason"] is not None and report["assigned_to"] is None
+    # Once staff have confirmed or corrected the category (LS-19), a later AI
+    # result never overrides that decision.
+    untouched_in_review = (
+        report["review_reason"] is not None
+        and report["assigned_to"] is None
+        and report["category_confirmed_by"] is None
+    )
     return newly_submitted or untouched_in_review
 
 

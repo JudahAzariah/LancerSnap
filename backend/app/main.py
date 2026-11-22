@@ -19,6 +19,7 @@ from app.api import (
     admin_routing,
     admin_users,
     analysis,
+    category,
     duplicates,
     health,
     me,
@@ -96,6 +97,7 @@ def create_app() -> FastAPI:
     app.include_router(reports.router)
     app.include_router(analysis.router)
     app.include_router(duplicates.router)
+    app.include_router(category.router)
     app.include_router(review.router)
     app.include_router(staff.router)
     return app

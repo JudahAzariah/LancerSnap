@@ -256,10 +256,22 @@ see it. Nothing is lost.
   and automatic routing never moves the report again. Reviewers pick teams
   from `GET /teams` (active teams, not the review team).
 - **Retry:** a failed analysis can be sent again (`POST /reports/{id}/analysis`).
-  While a report sits in review untouched by a person, a confident retry
-  routes it out of review automatically.
+  While a report sits in review untouched by a person (no one assigned, and
+  no staff-confirmed category), a confident retry routes it out of review
+  automatically.
 - **Manual-review routing** (LS-17) and any further columns will be added by
   later migrations rather than guessed now.
+
+## Staff category correction (LS-19)
+
+No schema change. `PUT /reports/{id}/category` `{"category_id": ...}` sets
+`reports.category_id` with `category_confirmed_by` / `category_confirmed_at`,
+for administrators and staff on the report's team (others get 404, students
+403). The AI's suggestion stays unchanged in `ai_analyses`, so the staff
+decision and the AI suggestion are always stored apart. The correction does
+not change the report's team or status, and a later AI result never overrides
+it. Duplicate decisions use the existing `PATCH /reports/{id}/duplicates/{id}`
+(LS-15) and never merge or change reports.
 
 ## Applying migrations
 
