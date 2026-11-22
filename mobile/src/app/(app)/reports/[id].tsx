@@ -13,6 +13,8 @@ import {
 import { useProfile } from '@/auth/ProfileProvider';
 import { AiAnalysisPanel } from '@/components/AiAnalysisPanel';
 import { Button } from '@/components/Button';
+import { CategoryCorrection } from '@/components/CategoryCorrection';
+import { DuplicatePanel } from '@/components/DuplicatePanel';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ApiError } from '@/lib/api';
 import { locationTypeLabel } from '@/report/locations';
@@ -40,8 +42,9 @@ export default function ReportDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadCount, setLoadCount] = useState(0);
   const profile = useProfile();
-  // Staff and administrators also see the AI analysis; students only see the
-  // category (LS-13). The backend enforces this too.
+  // Staff and administrators also see the AI analysis and possible duplicates,
+  // and can confirm or correct the category (LS-14, LS-19); students only see
+  // the category (LS-13). The backend enforces this too.
   const showsAnalysis = profile.status === 'ready' && profile.profile.role !== 'student';
 
   const load = useCallback(async () => {
@@ -114,13 +117,31 @@ export default function ReportDetailsScreen() {
         <View style={styles.gapSmall}>
           <StatusBadge status={report.status} />
         </View>
-        <Text style={styles.body}>{statusDescription(report.status)}</Text>
+        {/* Written for the student ("Your report…"), so staff do not see it. */}
+        {showsAnalysis ? null : (
+          <Text style={styles.body}>{statusDescription(report.status)}</Text>
+        )}
       </View>
 
       {/* Near the top, so it is seen without scrolling past the photo. */}
       {report.category ? <CategoryField category={report.category} /> : null}
-
-      {showsAnalysis ? <AiAnalysisPanel refreshKey={loadCount} reportId={report.id} /> : null}
+      {showsAnalysis ? (
+        <>
+          {report.category ? null : (
+            <View>
+              <Text style={styles.label}>Category</Text>
+              <Text style={styles.value}>No category yet.</Text>
+            </View>
+          )}
+          <CategoryCorrection
+            current={report.category}
+            onSaved={() => void load()}
+            reportId={report.id}
+          />
+          <AiAnalysisPanel refreshKey={loadCount} reportId={report.id} />
+          <DuplicatePanel refreshKey={loadCount} reportId={report.id} />
+        </>
+      ) : null}
 
       <Text style={styles.label}>Photo</Text>
       {report.media_id ? <ReportPhoto mediaId={report.media_id} /> : <Text style={styles.body}>No photo.</Text>}

@@ -43,7 +43,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   return (await response.json()) as T;
 }
 
-function sendJson<T>(method: 'POST' | 'PATCH', path: string, body: unknown): Promise<T> {
+function sendJson<T>(method: 'POST' | 'PUT' | 'PATCH', path: string, body: unknown): Promise<T> {
   return apiFetch<T>(path, {
     method,
     headers: { 'Content-Type': 'application/json' },
@@ -54,6 +54,11 @@ function sendJson<T>(method: 'POST' | 'PATCH', path: string, body: unknown): Pro
 /** POST a JSON body to the backend as the signed-in user. */
 export function apiPost<T>(path: string, body: unknown): Promise<T> {
   return sendJson<T>('POST', path, body);
+}
+
+/** PUT (replace) with a JSON body as the signed-in user. */
+export function apiPut<T>(path: string, body: unknown): Promise<T> {
+  return sendJson<T>('PUT', path, body);
 }
 
 /** PATCH (partially update) with a JSON body as the signed-in user. */
